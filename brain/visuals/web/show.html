@@ -208,6 +208,23 @@
   .words input:focus { border-color: var(--border2); box-shadow: 0 0 0 3px var(--accent-soft); }
   .hint2 { margin: 6px 2px 0; font-size: 12px; color: var(--faint); }
   .under { margin-top: 10px; }
+  /* Projection: what the controls play with, under the picture: the Focus look, or one surface */
+  .targets { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; }
+  .targets:empty { display: none; }
+  .tchip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 104px; max-width: 200px; padding: 7px 12px;
+           border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text); text-align: left; }
+  .tchip b { font-size: 13px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tchip small { font-size: 11px; color: var(--dim); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tchip:hover { background: var(--card2); }
+  .tchip.on { background: var(--text); border-color: var(--text); color: var(--on); } .tchip.on small { color: inherit; opacity: .65; }
+  .targets select { flex: none; height: auto; border-radius: 10px; background: var(--card); color: var(--text); border: 1px solid var(--border); font: 500 13px var(--font); padding: 0 8px; }
+  .looklist .tofocus { grid-column: 1 / -1; }
+  .label em.for { font-style: normal; font-weight: 600; color: var(--text); background: var(--muted); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
+  .label em.for:empty { display: none; }
+  /* A surface on its own sketch is picked: what only plays the Focus look steps back, and says so */
+  body.own .fo { opacity: .35; pointer-events: none; }
+  .fonote { font-size: 12px; color: var(--dim); background: var(--card); border: 1px dashed var(--border2); border-radius: 10px; padding: 8px 10px; margin: 4px 0 10px; }
+  #pv canvas#ov { cursor: pointer; }
   /* More: the segment is the dropdown itself (an invisible native select over it), so one tap opens the phone's picker */
   .trans .morebtn { position: relative; }
   .trans .morebtn select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
@@ -252,24 +269,24 @@
     :root { --chrome: 160px; }
     main { max-width: 1480px; padding-bottom: 96px; }
     .screen:not(.stage) { max-width: 960px; margin: 0 auto; }
-    .stagegrid { display: grid; gap: 20px; height: calc(100vh - var(--chrome)); align-items: stretch; }
+    .stagegrid { display: grid; gap: 20px; height: calc(100vh - var(--chrome) - var(--top, 0px)); align-items: stretch; }
     .stagegrid.vis { grid-template-columns: 280px minmax(0, 1fr) 280px; }
     .stagegrid .side { display: block; order: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; padding: 2px 6px 16px 2px; }
     .stagegrid .centre { order: 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
     .stagegrid .label { line-height: 16px; min-height: 16px; }
     .stagegrid .label.first { margin-top: 4px; }
-    .stagegrid .centre { justify-content: flex-start !important; padding-top: 30px; }
+    .stagegrid .centre { justify-content: flex-start !important; padding-top: 4px; }
     .stagegrid .side .presets { padding: 0; }
     .side .g3 { grid-template-columns: 1fr; } .side .g3 .tile { min-height: 84px; font-size: 18px; }
     .side .presets { flex-direction: column; overflow: visible; margin: 0; gap: 6px; }
     .side .presets .tile { flex: none; min-height: 44px; }
     .side .saved input { width: 100%; }
-    .side .looklist { grid-template-columns: 1fr 1fr; }
+    .side .looklist { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .side .themes { flex-wrap: wrap; overflow: visible; }
     .side .g3.energy { grid-template-columns: repeat(3, minmax(0, 1fr)); } .side .g3.energy .tile { min-height: 56px; font-size: 14px; }
     .stagegrid .side .label span { display: none; }
-    .stagegrid.vis .centre .pv { width: 100%; max-width: calc((100vh - var(--chrome) - 172px) * 16 / 9); }   /* 172: fader, level and now playing */
-    .stagegrid.vis .centre .level, .stagegrid.vis .centre .under, .stagegrid.vis .centre .np { width: 100%; max-width: calc((100vh - var(--chrome) - 172px) * 16 / 9); margin-left: auto; margin-right: auto; }
+    .stagegrid.vis .centre .pv { width: 100%; max-width: calc((100vh - var(--chrome) - var(--top, 0px) - 166px) * 16 / 9); }   /* 166: the surface chips, fader and level */
+    .stagegrid.vis .centre .level, .stagegrid.vis .centre .under { width: 100%; max-width: calc((100vh - var(--chrome) - var(--top, 0px) - 166px) * 16 / 9); margin-left: auto; margin-right: auto; }
   }
   @media (min-width: 1100px) and (max-height: 820px) {
     #s-lights .label { margin: 14px 2px 8px; } #s-lights .strip { margin-top: 4px; }
@@ -278,7 +295,33 @@
     #s-lights .level { height: 48px; }
   }
 
-  /* ---------------------------------------------------------------- now playing (Visuals, above the picture) */
+  /* ---------------------------------------------------------------- the top strip: now playing and the phase, on both screens */
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 10px; margin: 0 auto 14px; max-width: 1480px; }
+  .top .np { margin: 0; }
+  @media (min-width: 1100px) and (min-height: 600px) { body[data-screen=lights] .top { max-width: 960px; } }
+  .phase { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; column-gap: 10px; align-items: center;
+           padding: 7px 14px 9px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); overflow: hidden; }
+  .phk { grid-column: 1 / -1; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phk em { font-style: normal; color: var(--text); }
+  .phase b { font-size: 18px; font-weight: 600; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phase.hot b { color: var(--accent); }
+  .phsub { grid-column: 1; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phbeat { grid-column: 2; grid-row: 2 / 4; display: flex; gap: 4px; }
+  .phbeat i { width: 14px; height: 5px; border-radius: 99px; background: var(--border2); }
+  .phbeat i.on { background: var(--text); } .phbeat i.on:first-child { background: var(--accent); }
+  .phbar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); transition: width .25s linear; }
+  @media (max-width: 560px) {                                   /* pinned under the header on both screens: two compact rows */
+    .top { position: sticky; top: var(--hdr, 64px); z-index: 7; grid-template-columns: 1fr; gap: 0; margin: 0 -14px 10px; background: var(--bg);
+           box-shadow: 0 12px 18px -14px rgba(0,0,0,.7); }
+    .top .np { border-radius: 0; border-width: 0 0 1px; padding: 8px 14px 10px; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; }
+    .phase { border-radius: 0; border-width: 0 0 1px; padding: 5px 14px 7px; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto; column-gap: 8px; }
+    .phsub { text-align: right; }
+    .phk { grid-column: auto; } .phase b { font-size: 14px; } .phsub { grid-column: auto; } .phbeat { grid-column: auto; grid-row: auto; }
+    #s-visuals .pvstack { top: calc(var(--hdr, 64px) + var(--top, 0px)) !important; }
+    #s-lights .strip { top: calc(var(--hdr, 64px) + var(--top, 0px)) !important; }
+  }
+
+  /* ---------------------------------------------------------------- now playing (in the top strip) */
   .np { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center;
         margin-bottom: 10px; padding: 7px 14px 9px 8px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); overflow: hidden; }
   .npart { width: 40px; height: 40px; border-radius: 8px; background: var(--card2) center / cover; display: grid; place-items: center; color: var(--faint); }
@@ -295,7 +338,6 @@
   .npbar .cue { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); }
   .np.idle .npti b { color: var(--dim); font-weight: 500; } .np.idle .npbar { display: none; }
   @media (max-width: 560px) {                                   /* pinned with the picture: one compact row */
-    #s-visuals .pvstack .np { margin: 0; border-radius: 0; border-width: 0 0 1px; padding: 8px 14px 10px; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; }
     .npart { width: 36px; height: 36px; } .npk { display: none; } .npti b { font-size: 14px; } .npr b { font-size: 17px; }
   }
 
@@ -493,6 +535,22 @@
 <div id="off">Can't reach the lighting brain. Lights will come back when it does.</div>
 
 <main>
+  <!-- ======================= TOP: the same on both screens ======================= -->
+  <!-- What's playing, and where the show is in it (the scene engine's phase), plus which screen you're working in. -->
+  <div class="top" id="top">
+    <div class="np" id="np" title="The track the show is following">
+      <div class="npart" id="npArt"></div>
+      <div class="npti"><span class="npk" id="npKick">Now playing</span><b id="npTitle">Nothing playing</b><span class="npsub" id="npSub"></span></div>
+      <div class="npr"><b id="npBpm"></b><span id="npLeft"></span></div>
+      <div class="npbar" id="npBar"><i id="npPos"></i></div>
+    </div>
+    <div class="phase" id="phase" title="Where the show is in the track (the lights' scene engine)">
+      <span class="phk" id="phK">Lights</span>
+      <b id="phScene">—</b>
+      <span class="phsub" id="phSub"></span>
+      <div class="phbeat" id="phBeat"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
   <!-- ======================= LIGHTS ======================= -->
   <section class="screen" id="s-lights">
     <div class="strip" id="strip"></div>
@@ -533,10 +591,10 @@
   <section class="screen stage" id="s-visuals"><div class="stagegrid vis">
     <div class="side left o2">
       <div class="nonly">
-        <div class="label first">Look <b id="lookCount"></b></div>
+        <div class="label first">Look <em class="for" id="lookFor"></em><b id="lookCount"></b></div>
         <div class="themes" id="themes"></div>
         <div class="looklist" id="looklist"></div>
-        <div class="shuf" id="shuf">
+        <div class="shuf fo" id="shuf">
           <div class="row"><button class="ampill" id="shufOn" title="Mixes to another look from this theme every few bars, on the downbeat (L)"><i></i>Shuffle</button>
             <span class="grow"></span><button class="chipbtn" id="shufSkip" title="Mix to the next look on the next downbeat">Skip</button></div>
           <div class="st" id="shufSt">Off</div>
@@ -546,24 +604,20 @@
     </div>
     <div class="centre o1">
       <div class="stick">
-      <div class="np" id="np" title="The track the show is following">
-        <div class="npart" id="npArt"></div>
-        <div class="npti"><span class="npk" id="npKick">Now playing</span><b id="npTitle">Nothing playing</b><span class="npsub" id="npSub"></span></div>
-        <div class="npr"><b id="npBpm"></b><span id="npLeft"></span></div>
-        <div class="npbar" id="npBar"><i id="npPos"></i></div>
-      </div>
       <div class="pv" id="pv"><canvas id="gl"></canvas><canvas id="ov"></canvas>
         <div class="live" id="liveTag"><i></i><span>On air</span></div>
         <div class="pvbeat" id="pvBeat"><button id="barP"></button><i></i><i></i><i></i><i></i></div>
         <div class="cap"><b id="skName">—</b><button class="pill" id="freeze">Freeze</button><button class="pill" id="next">Next look ›</button></div>
       </div>
-      <div class="under"><div id="intensity" title="How strongly the picture reacts, calm to full on. Glides, stays on the beat."></div></div>
+      <div class="under"><div class="targets" id="targets" title="What the controls play with: the Focus look, or one surface"></div>
+        <div id="intensity" class="fo" title="How strongly the picture reacts, calm to full on. Glides, stays on the beat."></div></div>
       </div>
       <div class="level nonly" id="lvVis" style="margin-top:10px"><div class="fill"></div><div class="t"><span>Projectors</span><span class="v">–</span></div></div>
     </div>
     <div class="side right o3">
-      <div class="nonly energyblk">
-        <div class="label first">Energy <span>a fresh take on this look</span></div>
+      <div class="fonote" id="foNote" hidden></div>
+      <div class="nonly energyblk fo">
+        <div class="label first">Energy <span>a fresh take on the Focus look</span></div>
         <div class="g3 energy">
           <button class="tile" data-energy="0.22">Calm<small>Z</small></button>
           <button class="tile" data-energy="0.55">Groove<small>X</small></button>
@@ -576,17 +630,17 @@
         <div class="st" id="playSt">Off · the look holds still</div>
         <div class="seg sm" id="playAmt" title="How far they move"><button data-v="0.25">Subtle</button><button data-v="0.5">Lively</button><button data-v="1">Wild</button></div>
       </div>
-      <div class="label fgap">Presets <b id="pCount"></b></div>
+      <div class="label fgap">Presets <em class="for" id="presetFor"></em><b id="pCount"></b></div>
       <div class="presets" id="presets"></div>
       <button class="randbtn" id="randPreset" title="A random preset for this look (R)"><span class="dice">⚄</span>Randomise<small>R</small></button>
-      <div class="trans" id="trans">
+      <div class="trans fo" id="trans">
         <div class="label">Changes <b id="tNow"></b></div>
         <div class="seg sm" id="tType" title="How one look hands over to the next"><button data-v="auto">Auto</button><button data-v="cut">Cut</button><button data-v="crossfade">Fade</button><button data-v="pick" title="Each change picks one of the ones you tick">Pick</button><button data-v="more" class="morebtn"><span id="tMoreLbl">More</span><select id="tMore" title="Every transition" aria-label="More transitions"></select></button></div>
         <div class="tpool" id="tPool" hidden></div>
         <div class="seg sm" id="tSync" title="When the change lands"><button data-v="now">Now</button><button data-v="beat">Beat</button><button data-v="bar">Bar</button><button data-v="drop">Drop</button></div>
       </div>
       <a class="padbtn" id="padBtn" href="pad.html"><span><b>Launchpad</b><small>Effects, push, chase: the visuals as pads</small></span><i>›</i></a>
-      <div id="wordsBox" hidden>
+      <div id="wordsBox" class="fo" hidden>
         <div class="label">Words <span>this look draws them</span></div>
         <form class="words" id="wordsForm"><input id="words" placeholder="ONE | TWO | THREE" autocomplete="off" spellcheck="false" enterkeyhint="done"><button class="chipbtn" type="submit">Set</button></form>
         <p class="hint2">Split words with |. One shows at a time.</p>
@@ -597,7 +651,7 @@
 
 <nav class="tabs" id="tabs">
   <button data-s="lights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg><span>Lights</span></button>
-  <button data-s="visuals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><circle cx="12" cy="13.5" r="2"/></svg><span>Visuals</span></button>
+  <button data-s="visuals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="20" height="10" rx="2"/><circle cx="8" cy="13" r="3"/><path d="M14 11h5M14 14h3M6 18v2M18 18v2"/></svg><span>Projection</span></button>
 </nav>
 
 <div id="sheet">
@@ -656,13 +710,14 @@ const pulse = el => { el.classList.add("held"); setTimeout(() => el.classList.re
 
 // ---------------------------------------------------------------- screens
 // The full page behind each screen: where "Full controls" goes from here.
-const FULL = { lights: [8090, "/"], visuals: [8110, "/"] };
+const FULL = { lights: [8090, "/"], visuals: [8100, "/edit"] };   // the Projection screen's is the Projection editor
 function show(name) {
   if (!FULL[name]) name = "visuals";                    // a screen this page no longer has (Decks, Mapping, Stage)
   const fp = FULL[name]; $("fullBtn").href = at(fp[0], fp[1]);
   on("#tabs button", b => b.dataset.s === name);
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === "s-" + name));
   localStorage.setItem("s5show", name);
+  document.body.dataset.screen = name;                  // the top strip takes the screen's width
   requestAnimationFrame(resize);
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.s));
@@ -803,8 +858,10 @@ poll();
 // ---------------------------------------------------------------- visuals
 let SK = null, AU = {}, FREEZE = false, lastPreset = "", PV = {};
 const R = new MapRenderer($("gl"), $("ov"));
-R.layout = { lead_ms: 60, brightness: 1, masks: [], surfaces: [
+// Until the projector's layout arrives (or if it has no surfaces), the Focus look full frame.
+const FULLFRAME = { lead_ms: 60, brightness: 1, masks: [], surfaces: [
   { id: "p", content: "gen", opacity: 1, hue_shift: 0, corners: [[0, 0], [1, 0], [1, 1], [0, 1]] }] };
+R.layout = FULLFRAME;
 // Only resize while the preview is showing; hidden, it keeps rendering small for the room glow.
 const AR = new AutoRes(() => resize());   // drops the preview's resolution only if this device can't keep up
 function resize() { const r = $("pv").getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1) * AR.scale; if (r.width) R.resize(Math.round(r.width * d), Math.round(r.height * d)); }
@@ -812,7 +869,7 @@ addEventListener("resize", resize);
 
 connectEvents(R, { pauseHidden: true,
   onStatus: ok => { const t = $("liveTag"); t.classList.toggle("off", !ok); t.querySelector("span").textContent = ok ? (FREEZE ? "Frozen" : "On air") : "Reconnecting"; },
-  onSketch: sk => { SK = sk; $("skName").textContent = sk.title || sk.name; refreshPresets(); paintLookState(); paintWords(); },
+  onSketch: sk => { SK = sk; tgKey = null; paintTarget(); refreshPresets(); paintLookState(); paintWords(); },
   onAuto: (a, frz) => {
     renderPlay();
     AU = a; FREEZE = !!frz; $("freeze").classList.toggle("on", FREEZE); $("freeze").textContent = FREEZE ? "Frozen" : "Freeze";
@@ -836,7 +893,17 @@ function energy(e, b) {
   const v = VJ.energyValues(params(), loOf, hiOf, e);
   send("/api/params", v, "Visuals").then(r => { if (r) { lastPreset = ""; paintPresets(); } });
 }
-$("next").onclick = async () => { const r = await send("/api/next", {}, "Next look"); if (r) toast("Mixing to " + r.sketch); };
+$("next").onclick = async () => {
+  const t = TG();
+  if (t) {                                                // a surface: another look from the theme, its own
+    const th = THEMES.find(x => x.id === themeNow()), pool = (th ? th.sketches : ALL).filter(n => n !== t.sketch && n !== (SK && SK.name));
+    if (!pool.length) return;
+    const n = pool[Math.floor(Math.random() * pool.length)];
+    if (await setSurface(t.id, pinTo(n), "Next look")) toast(`${t.name || t.id}: ${titleOf(n)}`);
+    return;
+  }
+  const r = await send("/api/next", {}, "Next look"); if (r) toast("Mixing to " + r.sketch);
+};
 function setFreeze(f) { send("/api/auto", { _freeze: f }, "Freeze"); }
 // The knob player (render.js playEval): one setting for every page and projector, held by the visuals service.
 function renderPlay() {
@@ -852,20 +919,39 @@ $("freeze").onclick = () => setFreeze(!FREEZE);
 
 let PRESETS = [];
 async function refreshPresets() {
-  try { PRESETS = (await (await fetch("/api/presets", { cache: "no-store" })).json()).presets || []; } catch (e) { PRESETS = []; }
+  // A surface with a look of its own: that sketch's presets, and loading one sets the surface's. Otherwise the Focus look's.
+  const o = typeof own === "function" ? own() : null, t = typeof TG === "function" ? TG() : null;
+  const url = o ? `/api/presets?sketch=${encodeURIComponent(o.sketch)}` : "/api/presets";
+  try { PRESETS = (await (await fetch(url, { cache: "no-store" })).json()).presets || []; } catch (e) { PRESETS = []; }
+  if (o) lastPreset = o.preset || "";
   if (!PRESETS.includes(lastPreset)) lastPreset = "";
-  $("pCount").textContent = PRESETS.length ? `${PRESETS.length} for ${SK ? SK.title || SK.name : "this look"}` : "";
+  $("presetFor").textContent = t ? "for " + (t.name || t.id) : "";
+  $("pCount").textContent = PRESETS.length ? `${PRESETS.length} for ${o ? titleOf(o.sketch) : SK ? SK.title || SK.name : "this look"}` : "";
   $("presets").innerHTML = PRESETS.length ? PRESETS.map(() => `<button class="tile"></button>`).join("")
     : `<div class="none">No presets for this look yet. Save some in Setup → Design looks.</div>`;
   [...$("presets").children].forEach((b, i) => {
     if (!b.classList.contains("tile")) return;
     const n = PRESETS[i]; b.dataset.p = n;
     b.textContent = n.replace(/[-_]+/g, " ").replace(/^./, c => c.toUpperCase());
-    b.onclick = async () => { if (await send(`/api/presets/${encodeURIComponent(n)}/load`, {}, "Preset")) { lastPreset = n; paintPresets(); } };
+    b.onclick = () => loadPreset(n);
   });
   paintPresets();
 }
 const paintPresets = () => on("#presets [data-p]", b => b.dataset.p === lastPreset);
+// Load a preset into the target: the Focus look (the visuals service), or the picked surface's own look.
+// A surface that was playing Focus keeps that sketch, as its own, with the preset.
+async function loadPreset(n, what = "Preset") {
+  const t = TG();
+  if (t && t.content === "gen") {
+    const sk = t.sketch || (SK && SK.name);
+    if (!sk) return false;
+    if (await setSurface(t.id, pinTo(sk, n), what)) { lastPreset = n; paintPresets(); return true; }
+    return false;
+  }
+  if (t) { toast(`${t.name || t.id} shows ${shows(t)}: pick a look for it first`); return false; }
+  if (await send(`/api/presets/${encodeURIComponent(n)}/load`, {}, what)) { lastPreset = n; paintPresets(); return true; }
+  return false;
+}
 
 // Randomise: a random preset for this look (never the one that's on). A look with no presets gets a
 // fresh random take instead, inside each setting's range.
@@ -874,12 +960,13 @@ async function randomise() {
   const pool = PRESETS.filter(n => n !== lastPreset);
   if (pool.length) {
     const n = pool[Math.floor(Math.random() * pool.length)];
-    if (await send(`/api/presets/${encodeURIComponent(n)}/load`, {}, "Randomise")) {
-      lastPreset = n; paintPresets();
+    if (await loadPreset(n, "Randomise")) {
       const el = [...$("presets").querySelectorAll("[data-p]")].find(x => x.dataset.p === n);
       if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
       toast(`Randomised: ${el ? el.textContent : n}`);
     }
+  } else if (own()) {
+    toast(`${titleOf(own().sketch)} has no presets yet`);
   } else if (SK) {
     const v = VJ.energyValues(params(), loOf, hiOf, Math.random());
       if (await send("/api/params", v, "Randomise")) toast("Randomised this look");
@@ -896,7 +983,7 @@ const themeNow = () => (SHUF && SHUF.theme) || "all";
 async function loadLooks() {
   try { const j = await (await fetch("/api/sketches", { cache: "no-store" })).json(); THEMES = j.themes || []; TITLES = j.titles || {}; ALL = j.sketches || []; } catch (e) {}
   try { SHUF = SHUF || await (await fetch("/api/shuffle", { cache: "no-store" })).json(); } catch (e) {}
-  paintLooks(); paintShuffle();
+  paintLooks(); paintShuffle(); paintTarget();
 }
 function paintLooks() {
   const tid = themeNow(), th = THEMES.find(t => t.id === tid);
@@ -905,16 +992,27 @@ function paintLooks() {
   $("themes").querySelectorAll("button").forEach(b => b.onclick = () => { if (b.dataset.t !== themeNow()) send("/api/shuffle", { theme: b.dataset.t }, "Theme"); });
   const list = tid === "all" ? [...ALL].sort((a, b) => titleOf(a).localeCompare(titleOf(b))) : (th ? th.sketches : []);
   $("lookCount").textContent = th ? th.blurb || "" : `${ALL.length} looks`;
-  $("looklist").innerHTML = list.map(n => `<button data-s="${esc(n)}"><span>${esc(titleOf(n))}</span></button>`).join("");
+  const t = typeof TG === "function" ? TG() : null;
+  $("looklist").innerHTML = (t && !(t.content === "gen" && !t.sketch) ? `<button data-s="" class="tofocus" title="Back to the Focus look, with the other Focus surfaces"><span>↩ Focus · ${esc(focusName())}</span></button>` : "") +
+    list.map(n => `<button data-s="${esc(n)}"><span>${esc(titleOf(n))}</span></button>`).join("");
   $("looklist").querySelectorAll("button").forEach(b => b.onclick = () => pickLook(b.dataset.s));
   const cur = $("themes").querySelector(".on"); if (cur) cur.scrollIntoView({ block: "nearest", inline: "nearest" });
   paintLookState();
 }
 function paintLookState() {
-  const cur = SK && SK.name, q = SHUF && SHUF.queue && SHUF.queue.sketch;
+  const t = typeof TG === "function" ? TG() : null;
+  const cur = t ? (t.content === "gen" ? t.sketch || (SK && SK.name) : null) : SK && SK.name, q = !t && SHUF && SHUF.queue && SHUF.queue.sketch;
   $("looklist").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.s === cur); b.classList.toggle("pend", b.dataset.s === q && b.dataset.s !== cur); });
 }
 async function pickLook(n) {
+  const t = TG();
+  if (t) {                                                // a surface: it gets that look of its own (or goes back to Focus)
+    const nm = t.name || t.id;
+    if (!n) { if (await setSurface(t.id, pinTo(null), "Look")) toast(`${nm} is back on Focus`); return; }
+    if (t.content === "gen" && t.sketch === n) return toast(`${titleOf(n)} is already on ${nm}`);
+    if (await setSurface(t.id, pinTo(n), "Look")) toast(`${nm}: ${titleOf(n)}`);
+    return;
+  }
   if (SK && n === SK.name) return toast(`${titleOf(n)} is already on`);
   if (await send("/api/select", { sketch: n }, "Look")) toast(`Mixing to ${titleOf(n)}`);
 }
@@ -979,6 +1077,7 @@ $("tSync").querySelectorAll("button").forEach(b => b.onclick = () => setTrans({ 
 loadTrans();
 // The header's height, for what sticks under it on phones.
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", document.querySelector("header").offsetHeight + "px")).observe(document.querySelector("header"));
+new ResizeObserver(() => document.documentElement.style.setProperty("--top", ($("top").offsetHeight + 14) + "px")).observe($("top"));
 
 // Intensity: one fader for how busy the picture is, played live. It stays on the beat: speeds snap
 // to note values and nothing is retimed (see VJ.intensityValues).
@@ -1003,7 +1102,7 @@ addEventListener("pointerdown", e => { if (e.pointerType === "touch" && e.target
 // One loop: the preview, the room glow behind the app, and the beat.
 // The audio monitor, stacked under the picture; on phones the two stay pinned together.
 const drawWave = VJ.waveStrip($("pv"), R);
-{ const st = document.createElement("div"); st.className = "pvstack"; const box = $("pv").nextElementSibling; $("pv").before(st); st.append($("np"), $("pv"), box); }
+{ const st = document.createElement("div"); st.className = "pvstack"; const box = $("pv").nextElementSibling; $("pv").before(st); st.append($("pv"), box); }
 const paintWaveV = () => { const on = VJ.waveOn(); $("waveV").classList.toggle("on", on); $("waveV").setAttribute("aria-checked", on); };
 $("waveV").onclick = () => { VJ.waveOn(!VJ.waveOn()); paintWaveV(); };
 addEventListener("s5wavepv", paintWaveV); paintWaveV();
@@ -1011,14 +1110,14 @@ let ambAt = 0;   // the room glow: a copy of the picture a few times a second (r
 const amb = $("amb").getContext("2d"), pvDots = [...$("pvBeat").querySelectorAll("i")];
 const barP = VJ.barCounter($("barP"));
 requestAnimationFrame(function frame(now) {
-  R.draw(now); AR.frame(now);
+  R.draw(now, { projector: PROJ }); AR.frame(now); outlines();
   if (now - ambAt > 250 && document.documentElement.dataset.theme !== "light") {   // the glow is hidden in light mode
     ambAt = now; try { amb.drawImage($("gl"), 0, 0, 32, 18); } catch (e) {}
   }
   const f = R.lastFrame;
   if (f) for (const set of [pvDots]) set.forEach((d, i) => d.classList.toggle("on", i === Math.round(f.bwb) - 1 && 1 - f.frac > 0.4));
   INT.beat(f);
-  drawWave(f); barP(f);
+  drawWave(f); barP(f); paintPhase(f);
   requestAnimationFrame(frame);
 });
 
@@ -1028,10 +1127,110 @@ let LAY = null;
 const showVis = level($("lvVis"), async v => { const l = LAY; if (!l) return; l.brightness = v; await send(LAYOUT, l, "Projector level"); });
 async function pollLayout() {
   if (document.hidden) return setTimeout(pollLayout, 2000);
-  try { LAY = await (await fetch(LAYOUT, { cache: "no-store" })).json(); showVis(LAY.brightness); } catch (e) {}
-  setTimeout(pollLayout, 2000);
+  try { LAY = await (await fetch(LAYOUT, { cache: "no-store" })).json(); showVis(LAY.brightness); useLayout(LAY); } catch (e) {}
+  setTimeout(pollLayout, document.querySelector("#s-visuals.on") ? 1000 : 2000);
 }
+
+// ---------------------------------------------------------------- projection: the mapped picture, and what each surface shows
+// The preview is the projector's own output, as mapped (its layout from :8100): every surface playing
+// what it plays. Tap a surface (in the picture or the list) to pick it out; its picker says what it
+// shows: Focus (the look on the left, the one Shuffle plays), a sketch of its own, or a built-in.
+// The projector picked is shared with the Projection editor (s5proj).
+let PROJ = localStorage.getItem("s5proj") || "", SEL = null, presetsFor = {};
+const projOf = x => x.projector || "main";
+const mineS = () => LAY ? LAY.surfaces.filter(x => projOf(x) === R.projectorId(PROJ)) : [];
+// The target: the surface picked (null = the Focus look), and that surface if it plays a sketch of its own.
+const TG = () => SEL ? mineS().find(x => x.id === SEL) || null : null;
+const own = () => { const t = TG(); return t && t.content === "gen" && t.sketch ? t : null; };
+const BUILT = { show: "Lights' colours", pulse: "Beat flash", tunnel: "Tunnel", bars: "Bars", title: "Track name", solid: "Solid colour", test: "Test grid" };
+const focusName = () => SK ? SK.title || SK.name : "Focus";
+const shows = x => x.content !== "gen" ? BUILT[x.content] || x.content : x.sketch ? titleOf(x.sketch) + (x.preset ? " · " + x.preset : "") : "Focus · " + focusName();
+function useLayout(l) {
+  R.layout = l && l.surfaces.some(x => projOf(x) === R.projectorId(PROJ)) ? l : FULLFRAME;
+  if (R.layout !== FULLFRAME) R.layout.lead_ms = l.lead_ms ?? 60;
+  if (SEL && !TG()) SEL = null;                          // its surface went (deleted in the editor)
+  paintTarget();
+}
+function target(id) { SEL = id; paintTarget(); }
+let tgKey = null;
+function paintTarget() {
+  const list = mineS(), projs = (LAY && LAY.projectors) || [], t = TG(), o = own(), P = R.projectorId(PROJ);
+  // The chips under the picture: Focus, then every surface of this projector (and which projector, if there are more).
+  const nFocus = list.filter(x => x.content === "gen" && !x.sketch).length;
+  const html = (projs.length > 1 ? `<select id="projPick" aria-label="Projector">${projs.map(p => `<option value="${esc(p.id)}"${p.id === P ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>` : "") +
+    (list.length ? `<button class="tchip${t ? "" : " on"}" data-id=""><b>Focus</b><small>${esc(focusName())}${list.length ? ` · ${nFocus} surface${nFocus === 1 ? "" : "s"}` : ""}</small></button>` +
+      list.map(x => `<button class="tchip${t && t.id === x.id ? " on" : ""}" data-id="${esc(x.id)}"><b>${esc(x.name || x.id)}</b><small>${esc(shows(x))}</small></button>`).join("") : "");
+  if ($("targets").innerHTML !== html) {
+    $("targets").innerHTML = html;
+    $("targets").querySelectorAll(".tchip").forEach(b => b.onclick = () => target(b.dataset.id || null));
+    const pp = $("projPick"); if (pp) pp.onchange = () => { PROJ = pp.value; localStorage.setItem("s5proj", PROJ); SEL = null; useLayout(LAY); };
+  }
+  // Say what the panels are working on, and step back what only plays the Focus look.
+  const name = t ? t.name || t.id : "";
+  $("lookFor").textContent = t ? "for " + name : list.length ? "Focus" : "";
+  $("skName").textContent = t ? `${name} · ${shows(t)}` : "Focus · " + focusName();
+  document.body.classList.toggle("own", !!o);
+  $("foNote").hidden = !o;
+  if (o) $("foNote").textContent = `Playing with ${name}: the look and presets are its own. Energy, Intensity, Shuffle, Changes and Words play the Focus look; tap Focus under the picture for them.`;
+  const key = o ? o.id + "|" + o.sketch + "|" + (o.preset || "") : t ? "t" : "focus";
+  if (key !== tgKey) { tgKey = key; refreshPresets(); paintLooks(); }
+}
+// Change one surface: on a fresh copy of the layout, so a change made in the editor meanwhile isn't undone.
+async function setSurface(id, change, what = "Surface") {
+  let l;
+  try { l = await (await fetch(LAYOUT, { cache: "no-store" })).json(); } catch (e) { return toast("Projection: can't reach it"); }
+  const x = l.surfaces.find(y => y.id === id);
+  if (!x) return toast("That surface has gone (changed in the editor?)");
+  change(x);
+  if (await send(LAYOUT, l, what)) { LAY = l; useLayout(l); return true; }
+}
+const pinTo = (n, preset = null) => x => Object.assign(x, n ? { content: "gen", sketch: n, preset } : { content: "gen", sketch: null, preset: null });
+// The target, marked on the picture: the surface picked, or every surface playing Focus (the rest faint).
+function outlines() {
+  if (R.layout === FULLFRAME) return;
+  const o = R.o, W = R.ov.width, H = R.ov.height, d = Math.max(1, W / 900), t = TG();
+  R.ovDirty = true;
+  for (const x of mineS()) {
+    const on = t ? x.id === t.id : x.content === "gen" && !x.sketch;
+    o.strokeStyle = on ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.16)"; o.lineWidth = (on ? 3 : 1) * d;
+    o.setLineDash(on && !t ? [8 * d, 6 * d] : []);
+    o.beginPath(); x.corners.forEach(([u, v], i) => i ? o.lineTo(u * W, v * H) : o.moveTo(u * W, v * H)); o.closePath(); o.stroke();
+  }
+  o.setLineDash([]);
+}
+const inside = (pt, c) => { let r = false; for (let i = 0, j = c.length - 1; i < c.length; j = i++)
+  if ((c[i][1] > pt[1]) !== (c[j][1] > pt[1]) && pt[0] < (c[j][0] - c[i][0]) * (pt[1] - c[i][1]) / (c[j][1] - c[i][1]) + c[i][0]) r = !r; return r; };
+// Tap a surface on the picture to play with it; tap it again (or anywhere else) to go back to Focus.
+$("ov").addEventListener("click", e => {
+  const r = $("ov").getBoundingClientRect(), pt = [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+  const hit = mineS().filter(x => inside(pt, x.corners)).pop();       // the top one: drawn last
+  target(hit && hit.id !== SEL ? hit.id : null);
+});
 pollLayout();
+
+// ---------------------------------------------------------------- the phase (top strip)
+// Where the show is in the track, the same on both screens: the scene engine's phase in words, the
+// bar and how far to the drop, the movement the lights are playing, the beat; and which screen
+// you're in (with the surface you're playing with, on Projection).
+const phDots = [...$("phBeat").querySelectorAll("i")];
+let phKey = "";
+function paintPhase(f) {
+  if (f) phDots.forEach((d, i) => d.classList.toggle("on", i === Math.round(f.bwb) - 1 && 1 - f.frac > 0.4));
+  const scr = document.querySelector("#s-lights.on") ? "Lights" : "Projection", t = scr === "Projection" && typeof TG === "function" ? TG() : null;
+  const sc = S.scene, btd = S.beats_to_drop, sub = [];
+  if (S.bar) sub.push(`bar ${S.bar}`);
+  if (sc === "BUILD" || sc === "HOLD") sub.push(`${Math.round((S.progress || 0) * 100)}% built`);
+  if (sc === "DROP" && S.since_drop != null) sub.push(`${Math.floor(S.since_drop / 4) + 1} bars in`);
+  else if (btd) sub.push(btd <= 8 ? `drop in ${Math.ceil(btd)} beats` : `drop in ${Math.ceil(btd / 4)} bars`);
+  if (S.play && sc !== "IDLE") sub.push(PLAY_NAME[S.play] || S.play);
+  const key = [scr, t && (t.name || t.id), sc, S.look, sub.join()].join("|");
+  if (key === phKey) return;
+  phKey = key;
+  $("phK").innerHTML = esc(scr) + (t ? ` · <em>${esc(t.name || t.id)}</em>` : scr === "Projection" ? " · <em>Focus</em>" : "") + (S.look ? " · held" : "");
+  $("phScene").textContent = sc ? nice(sc) : "—";
+  $("phase").classList.toggle("hot", sc === "DROP" || sc === "PREDROP");
+  $("phSub").textContent = sub.join(" · ");
+}
 
 // ---------------------------------------------------------------- now playing
 // The track the show is following, from the decks (deckdash :8080): showbrain's live deck if it's
