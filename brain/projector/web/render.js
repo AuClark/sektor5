@@ -118,6 +118,9 @@ function autoEval(a, beat, inBar, time) {
 // look: speeds and counts (a sketch works position out from beat x speed, so a new speed leaps),
 // switches and choices, "fixed" and "quality" settings, and a knob with its own automation on.
 // A sketch can opt a setting in or out with "play": true / false in its json.
+// A sketch with presets uses them as the control points: every 8 bars the whole look glides (over two
+// bars, from the 1) towards one of its presets, or back to the values you set, never the same one
+// twice running; how far it goes is the amount (Wild arrives). Without presets each setting wanders.
 const PLAY_BUSY = new Set(["aamt", "bamt", "camt", "bounce", "dance", "noodle", "boil", "film", "glow",
   "jitter", "twist", "zoom", "patscale", "detail", "density", "beat", "punch", "kal", "rosette", "burst",
   "lines", "glitch", "rays", "surge", "lurch", "edge", "ember", "sparks", "amp", "warp", "bright"]);
@@ -150,6 +153,13 @@ function songPush(f) {
     case SCENES.GROOVE: return 0.9 * ((f.energy ?? 0.5) - 0.5);
     default: return -0.3;
   }
+}
+
+// The control point for phrase n (8 bars), the same on every page: -1 = the held values, else a preset.
+function playPoint(name, n, count) {
+  const raw = m => Math.floor(autoHash(playHash(name) * 131 + m) * (count + 1)) - 1;
+  const a = raw(n);
+  return a === raw(n - 1) ? ((a + 2) % (count + 1)) - 1 : a;   // never the same one twice running
 }
 
 // One knob's value: its held value, moved by the phrase and the song. bb is the beat counted
@@ -247,6 +257,7 @@ uniform float u_opacity, u_bright, u_sel, u_time;
 uniform float u_radius, u_border, u_bbright, u_bsat, u_bpulse;
 uniform float u_tri;   // 1: a triangle surface (apex at the top centre of the square)
 uniform float u_dia;   // 1: a diamond surface (the square's edge midpoints on its corners)
+uniform vec2 u_off;    // where the picture sits in its surface: + moves it right / down, in surface widths / heights
 uniform float u_px;   // one output pixel in surface units (surface height = 1), for anti-aliasing
 uniform sampler2D u_tex;
 // The live track's waveform, resampled per beat by the visuals service (trackwave.py).
@@ -448,7 +459,7 @@ void main() {
     if (sd > 2.0 * u_px) discard;
   }
   float a = smoothstep(0.0, 1.5 * u_px, -sd) * u_opacity;
-  vec2 cuv = u_trole > 0.5 ? s5t_uv(uv) : uv;
+  vec2 cuv = (u_trole > 0.5 ? s5t_uv(uv) : uv) - u_off;   // the shape stays put; the picture inside it moves
   vec3 c = content(cuv) * u_bright;
   if (u_trole > 0.5 && u_trole < 1.5) {        // incoming: masked, with the transition's edge light
     vec3 g = vec3(0.0);
@@ -767,7 +778,7 @@ class MapRenderer {
     const u = {};
     for (const n of ["u_res", "u_Hinv", "u_aspect", "u_beat", "u_frac", "u_bwb", "u_bar", "u_hue", "u_scene", "u_progress",
                      "u_since", "u_energy", "u_sp", "u_opacity", "u_bright", "u_sel", "u_time", "u_tex",
-                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri", "u_dia",
+                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri", "u_dia", "u_off",
                      "u_wave", "u_wv", "u_wloop", "u_text", "u_textn", "u_trole", "u_tp", "u_tmode", "u_tseed", "u_tdur", "u_todrop", "u_cbeat", ...extra])
       u[n] = gl.getUniformLocation(p, n);
     return { p, u, a: gl.getAttribLocation(p, "a") };
@@ -913,6 +924,7 @@ class MapRenderer {
     gl.uniform2f(u.u_res, W, H);
     gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners, s.shape))));
     gl.uniform1f(u.u_tri, s.corners.length === 3 ? 1 : 0);
+    gl.uniform2f(u.u_off, s.off_x || 0, s.off_y || 0);
     gl.uniform1f(u.u_dia, isDiamond(s) ? 1 : 0);
     const xs = s.corners.map(c => c[0]), ys = s.corners.map(c => c[1]);
     gl.uniform4f(u.u_box, 2 * Math.min(...xs) - 1, 1 - 2 * Math.max(...ys), 2 * Math.max(...xs) - 1, 1 - 2 * Math.min(...ys));
@@ -990,13 +1002,35 @@ class MapRenderer {
     const pl = this.genPlay;
     if (!pl || !pl.on || !(pl.amount > 0)) return;
     const pb = F ? F.beat - (f.beat - bb) : bb, push = this._push ? this._push.v : 0;
+    // With presets: the phrase's control point (and the one it's leaving), glided over two bars from the 1.
+    const pts = this._playPoints(name), n = Math.floor(pb / 32), g = Math.min(1, Math.max(0, (pb - 32 * n) / 8));
+    const from = pts.length ? playPoint(name, n - 1, pts.length) : 0, to = pts.length ? playPoint(name, n, pts.length) : 0;
+    const u = g * g * (3 - 2 * g);
     for (const id in params) {
       const s = S[id], a = A[id];
       if (!s || (a && a.on) || !playable(s)) continue;
       const lo = a ? Math.max(s.min, a.lo) : s.min, hi = a ? Math.min(s.max, a.hi) : s.max;
       if (!(hi > lo)) continue;
-      live[id] = playEval(s, name + "|" + id, params[id], lo, hi, pb, push, pl.amount);
+      if (!pts.length) { live[id] = playEval(s, name + "|" + id, params[id], lo, hi, pb, push, pl.amount); continue; }
+      const base = params[id], at = i => i < 0 ? base : pts[i][id] ?? base;
+      const tgt = at(from) + (at(to) - at(from)) * u;
+      live[id] = Math.max(lo, Math.min(hi, base + pl.amount * (tgt - base) + pl.amount * (hi - lo) * 0.3 * playDir(s) * push));
     }
+  }
+
+  // The presets of a sketch, as the knob player's control points (fetched once, refreshed every minute).
+  _playPoints(name) {
+    if (!name) return [];
+    this._pp = this._pp || {};
+    const e = this._pp[name], now = performance.now();
+    if (!e || (!e.loading && now - e.at > 60000)) {
+      const keep = e ? e.pts : [];
+      this._pp[name] = { pts: keep, at: now, loading: true };
+      fetch(`${visualsBase()}/api/presets?sketch=${encodeURIComponent(name)}&values=1`).then(r => r.ok ? r.json() : null)
+        .then(j => { this._pp[name] = { pts: j && j.values ? Object.values(j.values) : keep, at: performance.now() }; })
+        .catch(() => { this._pp[name] = { pts: keep, at: performance.now() }; });
+    }
+    return this._pp[name].pts;
   }
 
   drawHandles(opts = {}) {

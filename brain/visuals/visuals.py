@@ -21,7 +21,7 @@ change to the projector and to the control page.
   /api/text         GET the words sketches can draw; POST {"text": "ONE|TWO"} to change them
   /api/select       POST {"sketch": NAME} to switch sketch
   /api/shuffle      GET Shuffle's state; POST {"on", "theme", "every", "skip"} to change it (see below)
-  /api/presets      GET preset names for the active sketch (?sketch=NAME for another one)
+  /api/presets      GET preset names for the active sketch (?sketch=NAME for another one; &values=1 with their values)
   /api/presets/NAME GET a preset; POST saves current values as NAME; POST .../NAME/load
   /api/transition   GET the transition settings (and the types); POST {"type", "beats", "sync", "pool"
                     (now, beat, bar, phrase, or drop: land on the next predicted drop),
@@ -901,6 +901,16 @@ class H(Gz, SimpleHTTPRequestHandler):
                 name = (q.get("sketch") or [None])[0]
                 if name and name not in sketch_names():
                     return self._json(404, {"error": "no such sketch"})
+                if (q.get("values") or [""])[0] == "1":       # with each one's values (the knob player's control points)
+                    sk = sketch if not name or name == sketch["name"] else load_sketch(name)
+                    out = {}
+                    for n in preset_names(name):
+                        try:
+                            pv, _, _ = split_saved(json.loads(preset_file(n, name).read_text()))
+                            out[n] = clamp_values(sk, pv, {})
+                        except (OSError, ValueError):
+                            pass
+                    return self._json(200, {"presets": preset_names(name), "values": out})
                 return self._json(200, {"presets": preset_names(name)})
             if path == "/api/transition":
                 return self._json(200, {"settings": transition, "types": ["auto", "pick", "cut"] + TRANS_TYPES + ["none"],

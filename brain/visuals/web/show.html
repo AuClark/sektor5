@@ -219,6 +219,17 @@
   .tchip.on { background: var(--text); border-color: var(--text); color: var(--on); } .tchip.on small { color: inherit; opacity: .65; }
   .targets select { flex: none; height: auto; border-radius: 10px; background: var(--card); color: var(--text); border: 1px solid var(--border); font: 500 13px var(--font); padding: 0 8px; }
   .looklist .tofocus { grid-column: 1 / -1; }
+  /* Position: nudge the picture inside the picked surface */
+  .nudge { margin-bottom: 14px; }
+  .nudgebox { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: stretch; margin: 8px 0; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 4px; }
+  .dpad button { display: grid; place-items: center; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text); touch-action: none; }
+  .dpad button svg { width: 18px; height: 18px; }
+  .dpad button:active, .dpad button.held { background: var(--text); color: var(--on); }
+  .dpad .mid { font-size: 10px; font-weight: 600; color: var(--dim); }
+  .xy { position: relative; border-radius: 10px; background: var(--card); border: 1px solid var(--border); touch-action: none; cursor: grab; min-height: 128px; overflow: hidden; }
+  .xy .cx, .xy .cy { position: absolute; background: var(--border2); } .xy .cx { left: 50%; top: 0; bottom: 0; width: 1px; } .xy .cy { top: 50%; left: 0; right: 0; height: 1px; }
+  .xy b { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 4px var(--accent-soft); left: 50%; top: 50%; }
   .label em.for { font-style: normal; font-weight: 600; color: var(--text); background: var(--muted); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
   .label em.for:empty { display: none; }
   /* A surface on its own sketch is picked: what only plays the Focus look steps back, and says so */
@@ -615,6 +626,18 @@
       <div class="level nonly" id="lvVis" style="margin-top:10px"><div class="fill"></div><div class="t"><span>Projectors</span><span class="v">–</span></div></div>
     </div>
     <div class="side right o3">
+      <div class="nudge" id="nudge" hidden>
+        <div class="label first">Position <em class="for" id="nudgeFor"></em><b id="nudgeV">centred</b></div>
+        <div class="nudgebox">
+          <div class="dpad" title="Shift the picture inside the surface (hold to keep going)">
+            <span></span><button data-d="0,-1" aria-label="Up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button><span></span>
+            <button data-d="-1,0" aria-label="Left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button><button class="mid" id="nudgeC" title="Back to the middle">Centre</button><button data-d="1,0" aria-label="Right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+            <span></span><button data-d="0,1" aria-label="Down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><span></span>
+          </div>
+          <div class="xy" id="xyPad" title="Drag to move the picture; double-tap to centre it"><i class="cx"></i><i class="cy"></i><b id="xyDot"></b></div>
+        </div>
+        <div class="seg sm" id="nudgeStep" title="How far one tap moves it"><button data-v="0.005">Fine</button><button data-v="0.02">Normal</button><button data-v="0.08">Big</button></div>
+      </div>
       <div class="fonote" id="foNote" hidden></div>
       <div class="nonly energyblk fo">
         <div class="label first">Energy <span>a fresh take on the Focus look</span></div>
@@ -1149,6 +1172,10 @@ function useLayout(l) {
   R.layout = l && l.surfaces.some(x => projOf(x) === R.projectorId(PROJ)) ? l : FULLFRAME;
   if (R.layout !== FULLFRAME) R.layout.lead_ms = l.lead_ms ?? 60;
   if (SEL && !TG()) SEL = null;                          // its surface went (deleted in the editor)
+  if (NUDGE) {                                           // a nudge still settling: keep it, not the poll's older copy
+    const x = mineS().find(y => y.id === NUDGE.id);
+    if (x && performance.now() < NUDGE.until) { x.off_x = NUDGE.x; x.off_y = NUDGE.y; } else NUDGE = null;
+  }
   paintTarget();
 }
 function target(id) { SEL = id; paintTarget(); }
@@ -1170,6 +1197,7 @@ function paintTarget() {
   $("lookFor").textContent = t ? "for " + name : list.length ? "Focus" : "";
   $("skName").textContent = t ? `${name} · ${shows(t)}` : "Focus · " + focusName();
   document.body.classList.toggle("own", !!o);
+  paintNudge();
   $("foNote").hidden = !o;
   if (o) $("foNote").textContent = `Playing with ${name}: the look and presets are its own. Energy, Intensity, Shuffle, Changes and Words play the Focus look; tap Focus under the picture for them.`;
   const key = o ? o.id + "|" + o.sketch + "|" + (o.preset || "") : t ? "t" : "focus";
@@ -1185,6 +1213,66 @@ async function setSurface(id, change, what = "Surface") {
   if (await send(LAYOUT, l, what)) { LAY = l; useLayout(l); return true; }
 }
 const pinTo = (n, preset = null) => x => Object.assign(x, n ? { content: "gen", sketch: n, preset } : { content: "gen", sketch: null, preset: null });
+// ---------- Position: nudge the picture inside the picked surface (off_x / off_y in the layout; render.js
+// draws the content shifted, the corners stay put). It moves on this preview at once and saves a moment
+// later; while it's settling, the layout poll can't snap it back.
+let NUDGE = null, nTimer = 0, nStep = +localStorage.getItem("s5nudge") || 0.02;
+const NMAX = 0.5;
+const offOf = t => NUDGE && NUDGE.id === t.id ? NUDGE : { x: t.off_x || 0, y: t.off_y || 0 };
+const offWords = o => { const w = (v, a, b) => Math.abs(v) < 0.0025 ? "" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? b : a}`;
+  return [w(o.x, "left", "right"), w(o.y, "up", "down")].filter(Boolean).join(", ") || "centred"; };
+function paintNudge() {
+  const t = TG();
+  $("nudge").hidden = !t;
+  on("#nudgeStep button", b => +b.dataset.v === nStep);
+  if (!t) return;
+  const o = offOf(t);
+  $("nudgeFor").textContent = "for " + (t.name || t.id);
+  $("nudgeV").textContent = offWords(o);
+  $("xyDot").style.left = (50 + o.x / NMAX * 50) + "%"; $("xyDot").style.top = (50 + o.y / NMAX * 50) + "%";
+}
+function nudgeTo(x, y) {
+  const t = TG(); if (!t) return;
+  const c = v => Math.round(Math.max(-NMAX, Math.min(NMAX, v)) * 1000) / 1000;
+  x = c(x); y = c(y);
+  NUDGE = { id: t.id, x, y, until: performance.now() + 2000 };
+  t.off_x = x; t.off_y = y;                               // the preview draws from this same layout object
+  paintNudge();
+  clearTimeout(nTimer);
+  nTimer = setTimeout(async () => {
+    const n = NUDGE; if (!n) return;
+    await setSurface(n.id, x2 => { x2.off_x = n.x; x2.off_y = n.y; }, "Position");
+    if (NUDGE === n) NUDGE.until = performance.now() + 800;
+  }, 160);
+}
+const nudgeBy = (dx, dy) => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x + dx * nStep, o.y + dy * nStep); } };
+$("nudge").querySelectorAll("[data-d]").forEach(b => {
+  const [dx, dy] = b.dataset.d.split(",").map(Number);
+  let rep = 0;
+  const stop = () => { clearTimeout(rep); clearInterval(rep); b.classList.remove("held"); };
+  b.onpointerdown = e => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add("held"); nudgeBy(dx, dy);
+    rep = setTimeout(() => { rep = setInterval(() => nudgeBy(dx, dy), 70); }, 350); };
+  b.onpointerup = b.onpointercancel = b.onlostpointercapture = stop;
+});
+$("nudgeC").onclick = () => nudgeTo(0, 0);
+$("nudgeStep").querySelectorAll("button").forEach(b => b.onclick = () => { nStep = +b.dataset.v; localStorage.setItem("s5nudge", nStep); paintNudge(); });
+{ // the pad: drag anywhere to move the picture with your finger (relative, so a touch never jumps it); double-tap centres
+  const pad = $("xyPad"); let st = null, lastTap = 0;
+  pad.onpointerdown = e => { const t = TG(); if (!t) return; e.preventDefault(); pad.setPointerCapture(e.pointerId);
+    const now = performance.now(); if (now - lastTap < 300) { nudgeTo(0, 0); st = null; return; } lastTap = now;
+    const o = offOf(t), r = pad.getBoundingClientRect(); st = { x: e.clientX, y: e.clientY, ox: o.x, oy: o.y, w: r.width, h: r.height }; };
+  pad.onpointermove = e => { if (!st) return; const k = e.shiftKey ? 0.25 : 1;
+    nudgeTo(st.ox + (e.clientX - st.x) / st.w * 2 * NMAX * k, st.oy + (e.clientY - st.y) / st.h * 2 * NMAX * k); };
+  pad.onpointerup = pad.onpointercancel = () => { st = null; };
+}
+// Arrow keys nudge too, on the Projection screen with a surface picked (Shift = Big).
+addEventListener("keydown", e => {
+  const d = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+  if (!d || !document.querySelector("#s-visuals.on") || !TG() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  const k = e.shiftKey ? 0.08 / nStep : 1; nudgeBy(d[0] * k, d[1] * k);
+}, true);
+
 // The target, marked on the picture: the surface picked, or every surface playing Focus (the rest faint).
 function outlines() {
   if (R.layout === FULLFRAME) return;
