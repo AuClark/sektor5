@@ -125,6 +125,8 @@
   .seg button { height: var(--h); border-radius: 9px; font-weight: 500; font-size: 14px; color: var(--dim); transition: background .12s, color .12s; }
   .seg button:hover { color: var(--text); background: var(--muted); }
   .seg button.on { background: var(--text); color: var(--on); }
+  #plays { grid-auto-flow: row; grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  @media (max-width: 760px) { #plays { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
   /* ---------------------------------------------------------------- level: the whole bar is the slider */
   .level { position: relative; height: 56px; border-radius: var(--r); overflow: hidden; background: var(--card); border: 1px solid var(--border);
@@ -499,6 +501,12 @@
       <button data-look="AUTO">Auto</button><button data-look="INTRO">Ambient</button><button data-look="GROOVE">Groove</button>
       <button data-look="BREAKDOWN">Break</button><button data-look="DROP">Drop</button>
     </div>
+    <div class="label">Movement <b id="lPlay"></b></div>
+    <div class="seg" id="plays" title="How the lights play off each other across the stage">
+      <button data-play="AUTO">Auto</button><button data-play="together">Together</button><button data-play="alternate" title="Left on 1 and 3, right on 2 and 4">Alternate</button>
+      <button data-play="swap" title="Left side for half a bar, then the right answers">Call &amp; answer</button><button data-play="bounce" title="A ball across the stage and back, on the 16ths">Bounce</button>
+      <button data-play="chase" title="A sweep across the rig, the other way each bar">Chase</button><button data-play="out" title="From the middle out to the ends">Out</button><button data-play="in" title="From the ends in to the middle">In</button>
+    </div>
     <div class="desk-2">
       <div>
         <div class="label">Hits <span>hold to keep them on</span></div>
@@ -545,7 +553,7 @@
         <div class="npbar" id="npBar"><i id="npPos"></i></div>
       </div>
       <div class="pv" id="pv"><canvas id="gl"></canvas><canvas id="ov"></canvas>
-        <div class="live" id="liveTag"><i></i><span>Live</span></div>
+        <div class="live" id="liveTag"><i></i><span>On air</span></div>
         <div class="pvbeat" id="pvBeat"><button id="barP"></button><i></i><i></i><i></i><i></i></div>
         <div class="cap"><b id="skName">—</b><button class="pill" id="freeze">Freeze</button><button class="pill" id="next">Next look ›</button></div>
       </div>
@@ -561,6 +569,12 @@
           <button class="tile" data-energy="0.55">Groove<small>X</small></button>
           <button class="tile" data-energy="0.92">Drop<small>C</small></button>
         </div>
+      </div>
+      <div class="label fgap">Knobs <span>moving with the song</span></div>
+      <div class="shuf" id="knobs">
+        <div class="row"><button class="ampill" id="playOn" title="The look's settings ride the song: some glide somewhere new every few bars, and the busy ones climb through a build and peak on the drop. Within each setting's range; never speeds or choices."><i></i>Play the knobs</button></div>
+        <div class="st" id="playSt">Off · the look holds still</div>
+        <div class="seg sm" id="playAmt" title="How far they move"><button data-v="0.25">Subtle</button><button data-v="0.5">Lively</button><button data-v="1">Wild</button></div>
       </div>
       <div class="label fgap">Presets <b id="pCount"></b></div>
       <div class="presets" id="presets"></div>
@@ -664,6 +678,7 @@ document.querySelectorAll("#sheet a[data-port]").forEach(a => a.href = at(a.data
 // ---------------------------------------------------------------- lights
 let S = {};
 document.querySelectorAll("[data-look]").forEach(b => b.onclick = () => cmd("look", b.dataset.look, "Scene"));
+document.querySelectorAll("[data-play]").forEach(b => b.onclick = () => cmd("play", b.dataset.play, "Movement"));
 
 function holdPad(el, name) {
   const set = v => { if (el.classList.contains("held") === v) return; el.classList.toggle("held", v); cmd(name, v, el.firstChild.textContent); };
@@ -719,6 +734,7 @@ const showLights = level($("lvLights"), v => cmd("intensity", v, "Lights level")
 function overrides() {
   const o = [];
   if (S.look) o.push(`${{ INTRO: "Ambient", GROOVE: "Groove", BREAKDOWN: "Break", DROP: "Drop" }[S.look]} scene`);
+  if (S.play_lock) o.push(`${PLAY_NAME[S.play_lock] || S.play_lock} movement`);
   if (S.palette && S.palette.mode === "lock") o.push("colour locked");
   if (S.palette && S.palette.mode === "cycle") o.push("colour cycling");
   if (S.palette && S.palette.mode === "visuals") o.push("colour from the visuals");
@@ -744,10 +760,13 @@ function renderPilot() {
 
 const NICE = { IDLE: "Waiting", INTRO: "Ambient", GROOVE: "Groove", BUILD: "Building", HOLD: "Holding", PREDROP: "Here it comes", DROP: "Drop", BREAKDOWN: "Break", OUTRO: "Outro" };
 const nice = s => NICE[s] || (s ? s[0] + s.slice(1).toLowerCase() : "—");
+const PLAY_NAME = { together: "Together", alternate: "Alternate", swap: "Call & answer", bounce: "Bounce", chase: "Chase", out: "Out", in: "In" };
 let strips = "";
 function renderLights() {
   on("[data-look]", b => (S.look || "AUTO") === b.dataset.look);
   $("lScene").textContent = S.look ? "" : `following the music · ${nice(S.scene)}`;
+  on("[data-play]", b => (S.play_lock || "AUTO") === b.dataset.play);
+  $("lPlay").textContent = S.play_lock ? "" : `picked by the track · ${PLAY_NAME[S.play] || "—"}`;
   $("black").classList.toggle("on", S.mode === "blackout");
   document.body.classList.toggle("dark", S.mode === "blackout");
   const pm = S.palette ? S.palette.mode : "auto";
@@ -792,11 +811,12 @@ function resize() { const r = $("pv").getBoundingClientRect(), d = Math.min(2, d
 addEventListener("resize", resize);
 
 connectEvents(R, { pauseHidden: true,
-  onStatus: ok => { const t = $("liveTag"); t.classList.toggle("off", !ok); t.querySelector("span").textContent = ok ? (FREEZE ? "Frozen" : "Live") : "Reconnecting"; },
+  onStatus: ok => { const t = $("liveTag"); t.classList.toggle("off", !ok); t.querySelector("span").textContent = ok ? (FREEZE ? "Frozen" : "On air") : "Reconnecting"; },
   onSketch: sk => { SK = sk; $("skName").textContent = sk.title || sk.name; refreshPresets(); paintLookState(); paintWords(); },
   onAuto: (a, frz) => {
+    renderPlay();
     AU = a; FREEZE = !!frz; $("freeze").classList.toggle("on", FREEZE); $("freeze").textContent = FREEZE ? "Frozen" : "Freeze";
-    $("liveTag").classList.toggle("frozen", FREEZE); $("liveTag").querySelector("span").textContent = FREEZE ? "Frozen" : "Live";
+    $("liveTag").classList.toggle("frozen", FREEZE); $("liveTag").querySelector("span").textContent = FREEZE ? "Frozen" : "On air";
     renderPilot();
   },
   onParams: p => { PV = p || {}; if (SK) INT.set(VJ.intensityOf(params(), loOf, hiOf, PV)); },
@@ -818,6 +838,16 @@ function energy(e, b) {
 }
 $("next").onclick = async () => { const r = await send("/api/next", {}, "Next look"); if (r) toast("Mixing to " + r.sketch); };
 function setFreeze(f) { send("/api/auto", { _freeze: f }, "Freeze"); }
+// The knob player (render.js playEval): one setting for every page and projector, held by the visuals service.
+function renderPlay() {
+  const p = R.genPlay || { on: false, amount: 0.5 };
+  $("playOn").classList.toggle("on", !!p.on);
+  const near = [...$("playAmt").querySelectorAll("button")].reduce((b, x) => Math.abs(+x.dataset.v - p.amount) < Math.abs(+b.dataset.v - p.amount) ? x : b);
+  $("playAmt").querySelectorAll("button").forEach(b => b.classList.toggle("on", !!p.on && b === near));
+  $("playSt").textContent = p.on ? `${near.textContent} · the knobs follow the song` : "Off · the look holds still";
+}
+$("playOn").onclick = () => send("/api/auto", { _play: { on: !(R.genPlay && R.genPlay.on) } }, "Play the knobs");
+$("playAmt").querySelectorAll("button").forEach(b => b.onclick = () => send("/api/auto", { _play: { on: true, amount: +b.dataset.v } }, "Play the knobs"));
 $("freeze").onclick = () => setFreeze(!FREEZE);
 
 let PRESETS = [];

@@ -16,7 +16,8 @@ change to the projector and to the control page.
   /api/sketches/NAME  GET any sketch (schema, glsl) with its values, for a projection surface that
                     shows it: live if it's active, else as last left; ?preset=P applies a preset
   /api/params       GET current values; POST {"id": value, ...} to change some
-  /api/auto         GET per-parameter automation; POST {"id": {...}, ...} to change some
+  /api/auto         GET per-parameter automation; POST {"id": {...}, ...} to change some,
+                    "_freeze" to hold it, "_play": {"on", "amount" 0..1} for the knob player
   /api/text         GET the words sketches can draw; POST {"text": "ONE|TWO"} to change them
   /api/select       POST {"sketch": NAME} to switch sketch
   /api/shuffle      GET Shuffle's state; POST {"on", "theme", "every", "skip"} to change it (see below)
@@ -76,6 +77,7 @@ sketch = None           # {"name", "title", "about", "groups", "glsl"}
 values = {}             # param id -> float
 auto = {}               # param id -> automation settings (see AUTO_KEYS)
 auto_freeze = False     # hold every automated value where it is (the page's Freeze)
+play = {"on": True, "amount": 0.5}   # the knob player: render.js rides the knobs with the song (playEval)
 text = "SEKTOR5"        # words for sketches that draw type, split on | or newline (see word() in COMMON)
 TEXT_MAX = 240
 CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
@@ -345,10 +347,41 @@ def switch(name, preset=None, override=None, bars=None):
         smsg = shuffle_message()
     broadcast({"t": "sketch", "sketch": sk, "trans": tr})
     broadcast({"t": "params", "params": snap})
-    broadcast({"t": "auto", "auto": asnap, "freeze": frz})
+    broadcast(auto_msg(asnap, frz))
     broadcast({"t": "text", "text": tsnap})
     broadcast(smsg)
     return tr
+
+
+def auto_msg(asnap, frz):
+    return {"t": "auto", "auto": asnap, "freeze": frz, "play": dict(play)}
+
+
+def play_set(d):
+    """The knob player's settings from a POST (caller holds the lock); kept across a restart."""
+    if not isinstance(d, dict):
+        return
+    if "on" in d:
+        play["on"] = bool(d["on"])
+    if "amount" in d:
+        try:
+            a = float(d["amount"])
+            if math.isfinite(a):
+                play["amount"] = max(0.0, min(1.0, a))
+        except (TypeError, ValueError):
+            pass
+    try:
+        (STATE / "play.json").write_text(json.dumps(play))
+    except OSError:
+        pass
+
+
+def play_restore():
+    try:
+        d = json.loads((STATE / "play.json").read_text())
+        play.update(on=bool(d.get("on", True)), amount=max(0.0, min(1.0, float(d.get("amount", 0.5)))))
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
 
 
 def save_values():
@@ -860,7 +893,7 @@ class H(Gz, SimpleHTTPRequestHandler):
             if path == "/api/params":
                 return self._json(200, values)
             if path == "/api/auto":
-                return self._json(200, {"auto": auto, "freeze": auto_freeze})
+                return self._json(200, {"auto": auto, "freeze": auto_freeze, "play": play})
             if path == "/api/text":
                 return self._json(200, {"text": text})
             if path == "/api/presets":
@@ -909,11 +942,13 @@ class H(Gz, SimpleHTTPRequestHandler):
                 with lock:
                     if "_freeze" in d:
                         auto_freeze = bool(d["_freeze"])
+                    if "_play" in d:
+                        play_set(d["_play"])
                     auto = clamp_auto(sketch, d, auto)
                     save_values()
                     snap = {k: dict(v) for k, v in auto.items()}
                     frz = auto_freeze
-                broadcast({"t": "auto", "auto": snap, "freeze": frz})
+                broadcast(auto_msg(snap, frz))
                 return self._json(200, {"ok": True})
             if path == "/api/text":
                 with lock:
@@ -979,7 +1014,7 @@ class H(Gz, SimpleHTTPRequestHandler):
                 if snap is not None:
                     broadcast(shuffle_message_unlocked())
                     broadcast({"t": "params", "params": snap, "trans": tr})
-                    broadcast({"t": "auto", "auto": asnap, "freeze": auto_freeze})
+                    broadcast(auto_msg(asnap, auto_freeze))
                     broadcast({"t": "text", "text": tsnap})
                 return self._json(200, {"ok": True})
         except (ValueError, KeyError, TypeError) as e:
@@ -994,7 +1029,7 @@ class H(Gz, SimpleHTTPRequestHandler):
             first = ("data: " + json.dumps({"t": "hello", "version": code_version()}) + "\n\n"
                      "data: " + json.dumps({"t": "sketch", "sketch": sketch}) + "\n\n"
                      "data: " + json.dumps({"t": "params", "params": values}) + "\n\n"
-                     "data: " + json.dumps({"t": "auto", "auto": auto, "freeze": auto_freeze}) + "\n\n"
+                     "data: " + json.dumps(auto_msg(auto, auto_freeze)) + "\n\n"
                      "data: " + json.dumps({"t": "text", "text": text}) + "\n\n"
                      "data: " + json.dumps(shuffle_message()) + "\n\n"
                      "data: " + json.dumps({"t": "transition", "settings": transition}) + "\n\n"
@@ -1024,6 +1059,7 @@ if __name__ == "__main__":
         active = ""
     select(active if active in names else names[0])
     shuffle_restore()
+    play_restore()
     try:
         transition.update(json.loads((STATE / "transition.json").read_text()))
     except (OSError, ValueError):

@@ -157,6 +157,7 @@ class Engine:
         self.vis_hue = None             # where the lights' hue has glided to in visuals mode
         self.vis_t = 0.0
         self.speed = 1.0                # 0.5 half-time, 1, 2 double-time
+        self.play = None                # latched interplay (looks.PLAYS), else picked by the track
         # Mixer reactions (DJM-450 via brain/mixer): bass kill, level, kicks, and mapped MIDI controls.
         self.mixer_react = CONFIG.get("mixer", {}).get("react", True)
         self.bass_was_out = False
@@ -467,7 +468,8 @@ class Engine:
 
     # --- performance layer -------------------------------------------------
     def shape(self, ctx, t):
-        """Apply the Commander's latched look, speed and palette to the auto show's ctx."""
+        """Apply the Commander's latched look, play, speed and palette to the auto show's ctx."""
+        ctx["play"] = self.play
         if self.look and not self.forced:
             ctx["scene"] = self.look
             if self.look == "DROP":
@@ -600,6 +602,11 @@ class Engine:
                 return {"ok": False, "error": f"unknown look {v}"}
             self.look = None if v in (None, "AUTO") else v
             self.look_t = t
+        elif cmd == "play":
+            v = c.get("value")
+            if v not in (None, "AUTO", *looks.PLAYS):
+                return {"ok": False, "error": f"unknown play {v}"}
+            self.play = None if v in (None, "AUTO") else v
         elif cmd == "palette":
             v = c.get("value") or {}
             if v.get("mode") in ("auto", "lock", "cycle", "visuals"):
@@ -692,7 +699,7 @@ class Engine:
         elif cmd == "clear":
             self.forced, self.hold, self.strobe, self.mode = None, False, False, "auto"
             self.blinder = self.black_hold = False
-            self.look, self.palette_mode, self.speed = None, "auto", 1.0
+            self.look, self.palette_mode, self.speed, self.play = None, "auto", 1.0, None
         log(f"command {c}")
         return {"ok": True}
 
@@ -706,7 +713,7 @@ class Fixture:
     def __init__(self, cfg, index=0, group=1):
         self.cfg = cfg
         self.kind = cfg["kind"]             # strip | panel | pyramid | dmx_par
-        self.role = dict(cfg.get("role", {}), index=index, group=group)
+        self.role = dict(cfg.get("role", {}), index=index, group=group, kind=self.kind)
         self.state = {}
         self.delay = cfg.get("delay_ms", 0) / 1000.0
         self.queue = []                      # (time, frame) for delay compensation
@@ -944,7 +951,7 @@ def main():
             "mode": engine.mode, "follow": engine.follow, "lead_ms": engine.lead_ms,
             "intensity": engine.intensity, "hold": engine.hold, "strobe": engine.strobe,
             "strobe_div": engine.strobe_div, "blinder": engine.blinder, "black_hold": engine.black_hold,
-            "look": engine.look, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
+            "look": engine.look, "play": looks.play_of(ctx), "play_lock": engine.play, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
             "visual": None if not engine.visual else {"hue": round(engine.visual["hue"], 3), "sat": round(engine.visual["sat"], 2),
                                                       "age_s": round(time.time() - engine.visual["t"], 1)},
             "speed": engine.speed, "tap_bpm": round(engine.tap_bpm, 1),

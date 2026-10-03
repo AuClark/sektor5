@@ -17,7 +17,7 @@ presets and a desk section, with a launch-on-the-beat quantise. The **full contr
 for rigging a look up. They share the same state over the same event stream, so one device can set
 up while another plays. Both are described in **[visuals-live.md](visuals-live.md)**.
 
-**Live** (`:8110/show.html`) is the remote for the night: the lights and the visuals on one page,
+**Focus** (`:8110/show.html`) is the simple view for the night: the lights and the visuals on one page,
 with the track that's playing above the picture. See **[show-app.md](show-app.md)**.
 
 **Playing it live — [visuals-live.md](visuals-live.md).** Every parameter has a **range** (the orange
@@ -297,8 +297,8 @@ can read them immediately.
 ## Speed
 
 - **Compression and caching.** The visuals and projector services gzip what they send when the browser asks (pages and three.js shrink 3–4×, the venue 3×, and the Stage's light-frames stream 16×, each message still sent at once; the small event streams stay plain), and give every static file an ETag, so a browser that already has a file gets a 304 and no body. deckdash's HTTPS proxy passes neither header on, so it gets plain responses as before.
-- **Adaptive resolution.** The previews (Visuals page, Live, the Launchpad, the Projection editor) draw at no more than 2× the screen's pixels, and `AutoRes` (in `render.js`) steps one down, to half at most, if the device can't hold ~45 fps, and back up when it can. A device that keeps up never changes; one held at 30 fps whatever it draws (Low Power Mode) is left at full.
-- **Hidden pages pause.** Live, the Visuals page and the Launchpad close the event stream and stop polling while hidden (`pauseHidden`), and catch up the moment they're back. Live asks showbrain for its state 5 times a second on the Lights screen and twice a second on Visuals.
+- **Adaptive resolution.** The previews (Visuals page, Focus, the Launchpad, the Projection editor) draw at no more than 2× the screen's pixels, and `AutoRes` (in `render.js`) steps one down, to half at most, if the device can't hold ~45 fps, and back up when it can. A device that keeps up never changes; one held at 30 fps whatever it draws (Low Power Mode) is left at full.
+- **Hidden pages pause.** Focus, the Visuals page and the Launchpad close the event stream and stop polling while hidden (`pauseHidden`), and catch up the moment they're back. Focus asks showbrain for its state 5 times a second on the Lights screen and twice a second on Visuals.
 
 ## API (on :8110)
 

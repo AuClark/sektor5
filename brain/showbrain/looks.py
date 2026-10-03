@@ -55,6 +55,86 @@ def hat(frac):
     return math.exp(-14 * (frac - 0.5)) if frac >= 0.5 else 0.0
 
 
+# ---------------------------------------------------------------- interplay
+# The lights play off each other instead of all pumping together. Every fixture has a place across
+# the stage, -1 (far left, as the crowd sees it) to 1 (far right): pyramid L, tube L, the panel and
+# the par can in the middle, tube R, pyramid R. A "play" is a rule for when each place gets hit,
+# and every fixture works out its own kick from it, so they stay locked together with no messages
+# between them. Left and right are always mirror images, or a call and its answer.
+
+PLAYS = ("together", "alternate", "swap", "bounce", "chase", "out", "in")
+CALM_PLAYS = ("together", "alternate", "out")                  # intro, outro: nothing too busy
+DROP_PLAYS = ("alternate", "bounce", "chase", "out", "swap")   # the drop, after its first bar
+
+
+def stage_pos(role):
+    """-1 .. 1 across the stage: the fixture's "pos", else from its side (pyramids) or its place
+    in the strip group (the tubes either side of the DJ), else the middle."""
+    if "pos" in role:
+        return max(-1.0, min(1.0, float(role["pos"])))
+    if "side" in role:
+        return float(role["side"])
+    g = role.get("group", 1) if role.get("kind", "strip") == "strip" else 1
+    return -0.5 + role.get("index", 0) / (g - 1) if g > 1 else 0.0
+
+
+def play_of(ctx):
+    """The play for this stretch: the Commander's, else one picked by the track every 8 bars
+    (every 4 in a drop), from the plays that suit the scene."""
+    forced = ctx.get("play")
+    if forced in PLAYS:
+        return forced
+    s = ctx["scene"]
+    if s in ("INTRO", "OUTRO", "PAUSED"):
+        opts, span = CALM_PLAYS, 8
+    elif s == "DROP":
+        opts, span = DROP_PLAYS, 4
+    elif s == "GROOVE":
+        opts, span = PLAYS, 8
+    else:
+        return "together"
+    bar = int(ctx.get("bar", 0)) or int(ctx.get("beat", 0) // 4)
+    seed = sum(ord(c) for c in (ctx.get("title") or "")) * 7 + bar // span
+    return opts[seed % len(opts)]
+
+
+def _hits(play, pos, beat):
+    """(period in beats, [when in it this place is hit]). pos may be an array (the panel's columns)."""
+    pos = np.asarray(pos, dtype=np.float32)
+    left, right = pos < -0.01, pos > 0.01
+    u = (pos + 1) / 2                                   # 0 far left .. 1 far right
+    d = np.abs(pos)                                     # 0 middle .. 1 the ends
+    if play == "alternate":                             # left on 1 and 3, right on 2 and 4, the middle on all
+        return np.where(left | right, 2.0, 1.0), [np.where(right, 1.0, 0.0)]
+    if play == "swap":                                  # call and answer: left the first half bar, right the second
+        per = np.where(left | right, 4.0, 2.0)
+        return per, [np.where(right, 2.0, 0.0), np.where(right, 3.0, np.where(left, 1.0, 0.0))]
+    if play == "bounce":                                # a ball across the stage: left to right, then back
+        return 2.0, [u, 2.0 - u]
+    if play == "chase":                                 # across on the 16ths every other beat, the other way each bar
+        right_way = (int(beat // 4) % 2) == 0
+        return 2.0, [u if right_way else 1 - u]
+    if play == "out":                                   # the middle on the beat, out to the ends by the 'and'
+        return 1.0, [0.5 * d]
+    if play == "in":                                    # the ends on the beat, in to the middle by the 'and'
+        return 1.0, [0.5 * (1 - d)]
+    return 1.0, [0.0 * pos]
+
+
+def hit(ctx, role, pos=None):
+    """This fixture's kick under the play: 1 as it's hit, decaying until its next hit.
+    pos overrides where it stands (an array for the panel, so a bounce travels across it)."""
+    frac, bwb, beat = clock(ctx, role)
+    # Beats from a downbeat (beat 1 is the first downbeat); with no timeline, the beat events' place in the bar.
+    beat = beat - 1 if ctx.get("bar") else (bwb - 1) + frac
+    play = play_of(ctx)
+    period, phases = _hits(play, stage_pos(role) if pos is None else pos, beat)
+    since = np.min([np.mod(beat - ph, period) for ph in phases], axis=0)
+    fast = play in ("bounce", "chase", "out", "in")     # moving plays: a short flash reads as motion
+    k = np.exp(-(10.0 if fast else 6.0) * since)
+    return float(k) if np.ndim(k) == 0 else k
+
+
 # ---------------------------------------------------------------- strips
 
 def strip(ctx, n, role, state):
@@ -68,12 +148,12 @@ def strip(ctx, n, role, state):
         kick = 0.0                         # the clock is frozen: no pulse stuck on
 
     if s == "INTRO":
-        v = 0.1 + 0.06 * math.sin(2 * math.pi * beat / 8) + 0.6 * kick * drive(ctx)
+        v = 0.1 + 0.06 * math.sin(2 * math.pi * beat / 8) + 0.6 * hit(ctx, role) * drive(ctx)
         return hsv(hue + x * 0.1, 0.8, v)
 
     if s in ("GROOVE", "OUTRO", "PAUSED"):
         fade = {"OUTRO": 0.8, "PAUSED": 0.3}.get(s, 1.0)
-        k = min(1.0, kick * drive(ctx))
+        k = 0.0 if s == "PAUSED" else min(1.0, hit(ctx, role) * drive(ctx))
         accent = 0.35 if (bwb == 1) != bool(role.get("flip")) and bwb in (1, 3) else 0.0
         lvl = (0.18 + 0.82 * k + (0.25 * hat(frac) if s != "PAUSED" else 0.0)) * fade
         base = hsv(hue + 0.03 * (ctx["bar"] % 4) + x * 0.05, 1.0, lvl)
@@ -104,7 +184,7 @@ def strip(ctx, n, role, state):
         return np.zeros((n, 3), np.float32)
 
     if s == "DROP":
-        return strip_drop(ctx, n, role, x, frac, bwb, beat, kick)
+        return strip_drop(ctx, n, role, x, frac, bwb, beat, kick if ctx["since_drop"] < 4 else hit(ctx, role))
 
     return np.zeros((n, 3), np.float32)
 
@@ -258,7 +338,7 @@ def pyramid(ctx, n, role, state):
             front = 1 - sd
             out = np.where((x >= front)[..., None], white, hsv(hue, 1, 0.1)) + 0 * order[..., None]
         else:
-            out = pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st)
+            out = pyramid_drop(ctx, order, x, frac, bwb, beat, kick if sd < 4 else hit(ctx, role), mir, st)
         # The laser comes on with the drop: held for the first bar, then on the kick, then on the one.
         laser = 1.0 if sd < 4 else (1.0 if frac < 0.5 else 0.0) if sd < 32 else (1.0 if bwb == 1 and frac < 0.5 else 0.0)
     elif s == "BREAKDOWN":
@@ -273,12 +353,12 @@ def pyramid(ctx, n, role, state):
     elif s in ("INTRO", "OUTRO", "PAUSED"):
         fade = {"PAUSED": 0.4, "OUTRO": 0.8}.get(s, 1.0)
         breathe = 0.5 - 0.5 * math.cos(beat * math.pi / 4)
-        k = 0.0 if s == "PAUSED" else min(1.0, kick * drive(ctx))
+        k = 0.0 if s == "PAUSED" else min(1.0, hit(ctx, role) * drive(ctx))
         out = hsv(hue + 0.1 * x + 0.03 * order, 0.8, (0.08 + 0.12 * breathe + 0.55 * k) * (0.4 + 0.6 * x) * fade)
     else:
         # GROOVE (and anything else): the feet pulse with the kick, plus, by track and every 16
         # bars, an orbiting comet (one leg a beat, round the pyramid) or a spiral chase (a bar a lap).
-        k = min(1.0, kick * drive(ctx))
+        k = min(1.0, hit(ctx, role) * drive(ctx))
         base = hsv(hue + 0.06 * x + 0.03 * (ctx.get("bar", 0) % 4), 1.0, (0.2 + 0.8 * k + 0.2 * hat(frac)) * (1 - 0.4 * x))
         if _pyr_mode(ctx, ("orbit", "spiral")) == "orbit":
             headx = frac * 1.15
@@ -362,13 +442,15 @@ def panel(ctx, w, h, role, state):
         kick = 0.0
     centre = 1 - np.abs(Y - (h - 1) / 2) / (h * 0.62)
 
+    cols = stage_pos(role) + (X / max(1, w - 1) - 0.5) * role.get("span", 0.5)   # where each column stands
     if s == "INTRO":
-        v = 0.08 + 0.04 * math.sin(2 * math.pi * beat / 8) + 0.5 * min(1.0, kick * drive(ctx)) * centre
+        v = 0.08 + 0.04 * math.sin(2 * math.pi * beat / 8) + 0.5 * np.minimum(1.0, hit(ctx, role, cols) * drive(ctx)) * centre
         return hsv(hue + X / w * 0.2, 0.8, v)
 
     if s in ("GROOVE", "OUTRO", "PAUSED"):
         fade = {"OUTRO": 0.8, "PAUSED": 0.3}.get(s, 1.0)
-        v = (0.12 + 0.85 * min(1.0, kick * drive(ctx)) * centre) * fade
+        k = 0.0 if s == "PAUSED" else np.minimum(1.0, hit(ctx, role, cols) * drive(ctx))
+        v = (0.12 + 0.85 * k * centre) * fade
         out = hsv(hue + X / w * 0.15, 1.0, v)
         head = ((bwb - 1 + frac) / 4) * (w + 24)
         d = head - X
@@ -398,7 +480,8 @@ def panel(ctx, w, h, role, state):
             return np.ones((h, w, 3), np.float32)
         radius = (sd % 1.0) * w * 0.6
         ring = np.exp(-np.abs(np.abs(X - w / 2) - radius) / 4)
-        base = hsv(hue + (0.5 if int(sd) % 2 else 0), 1.0, (0.3 + 0.7 * kick) * 0.5) * np.ones((h, w, 1), np.float32)
+        k = kick if sd < 4 else hit(ctx, role, cols)
+        base = hsv(hue + (0.5 if int(sd) % 2 else 0), 1.0, (0.3 + 0.7 * k) * 0.5) * np.ones((h, w, 1), np.float32)
         return lerp(base, np.ones(3, np.float32), ring * 0.8)
 
     return np.zeros((h, w, 3), np.float32)
@@ -421,11 +504,10 @@ def par(ctx, role, state):
     if s == "IDLE":
         colour(ctx["t"] * 0.01, 0.9, 0.15)            # slow dim colour drift
     elif s == "INTRO":
-        colour(hue, 0.8, 0.12 + 0.6 * min(1.0, kick * drive(ctx)))
+        colour(hue, 0.8, 0.12 + 0.6 * min(1.0, hit(ctx, role) * drive(ctx)))
     elif s in ("GROOVE", "OUTRO", "PAUSED"):
         fade = {"OUTRO": 0.8, "PAUSED": 0.25}.get(s, 1.0)
-        if s == "PAUSED":
-            kick = 0.0
+        kick = 0.0 if s == "PAUSED" else hit(ctx, role)
         v = (0.18 + 0.82 * min(1.0, kick * drive(ctx))) * fade
         colour(hue + 0.03 * (ctx["bar"] % 4), 1.0, v)
         if bwb == 1:                                  # bar accent: push toward white
@@ -454,7 +536,7 @@ def par(ctx, role, state):
             out.update(r=1.0, g=1.0, b=1.0, w=1.0)
         else:
             strobe = sd < 4 and ((sd * 2) % 1.0) > 0.5
-            v = 0.0 if strobe else 0.35 + 0.65 * kick
+            v = 0.0 if strobe else 0.35 + 0.65 * (kick if sd < 4 else hit(ctx, role))
             colour(hue + (0.5 if int(sd) % 2 else 0.0), 1.0, v)
             out["uv"] = 0.3
     return out

@@ -10,7 +10,7 @@ Every control page (dashboard :8080, Commander :8090, projection mapping :8100/e
 
 ## Light and dark
 
-The sun / moon in every top bar cycles **Dark → Light → Match device**. It's one setting for the whole app, shared with Live (`localStorage` `s5theme`), applied before the first paint, and it follows other open tabs.
+The sun / moon in every top bar cycles **Dark → Light → Match device**. It's one setting for the whole app, shared with Focus (`localStorage` `s5theme`), applied before the first paint, and it follows other open tabs.
 
 How it works: every neutral grey in the pages' styles is written as `var(--nRRGGBB, #rrggbb)`, the same colour in dark mode. Light mode (`html[data-theme=light]`, in `s5auth.js`) mirrors each one onto a light zinc scale with its role kept: page, panels, hover, lines, outlines, faint, dim, text. White overlays are `rgba(var(--inv), a)`, which flips to black. **Write new greys the same way**, or they won't flip.
 
@@ -47,11 +47,11 @@ The same on every page (in `s5auth.js`): the **display** (waveforms, preview, st
 - **Inputs and selects:** the well colour, a 1 px outline, and an orange focus ring.
 - **Status tags:** small, 6 px corners, outlined in their status colour.
 - **Pictures** (previews, the stage): square, like the projector's frame.
-- **Intensity fader** (`VJ.fader` in `vj.js`, styled in `s5auth.js`): the whole bar is the control, an orange fill that breathes on the beat. On the Visuals page, the Launchpad and Live.
-- **Live** (`/show.html`) has a design system of its own, with a light mode; it opts out of the shared theme with `<html data-s5-own-theme>`.
+- **Intensity fader** (`VJ.fader` in `vj.js`, styled in `s5auth.js`): the whole bar is the control, an orange fill that breathes on the beat. On the Visuals page, the Launchpad and Focus.
+- **Focus** (`/show.html`) has a design system of its own, with a light mode; it opts out of the shared theme with `<html data-s5-own-theme>`.
 
 ## Top bar and phones
 
 - **One top bar on every page** (`.s5bar`, styled by `brain/common/web/s5auth.js`): 48 px (`--s5bar`, which everything pinned under it uses), never wraps. Logo (opens System) and page links on the left, in the same place on every page; page-specific bits fade in; the **SIM / NO DECKS** pill and the **lock** (orange view only, green admin) sit at the right end.
-- **Phones (≤ 760 px):** the page links move to a bottom tab bar with icons, in the same order as Live's: Decks · Lighting · Visuals · Projection · Stage · Live. Pages must never be wider than the screen: tables and wide rows scroll sideways inside their panel.
+- **Phones (≤ 760 px):** the page links move to a bottom tab bar with icons, in the same order as Focus's: Decks · Lighting · Visuals · Projection · Stage · Focus. Pages must never be wider than the screen: tables and wide rows scroll sideways inside their panel.
 - **Display first, controls in tabs:** on Lighting, Projection, Visuals and Stage the live view (Lighting's status and fixture strips, the projection preview, the visuals preview, the 3D stage) is pinned under the top bar, with **section tabs** under it (`S5AUTH.sectionTabs`); only the chosen section of controls shows, and the page remembers it. Projection and Visuals previews fill the width on phones and keep the projector's aspect ratio.

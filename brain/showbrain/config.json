@@ -13,7 +13,8 @@
       "leds": 60,
       "brightness": 0.85,
       "role": {
-        "flip": false
+        "flip": false,
+        "pos": -0.5
       }
     },
     {
@@ -23,7 +24,8 @@
       "leds": 60,
       "brightness": 0.85,
       "role": {
-        "flip": true
+        "flip": true,
+        "pos": 0.5
       }
     },
     {
@@ -35,7 +37,8 @@
       "from_apex": true,
       "brightness": 0.8,
       "role": {
-        "side": -1
+        "side": -1,
+        "pos": -1
       }
     },
     {
@@ -45,7 +48,8 @@
       "leds_per_leg": 56,
       "brightness": 0.7,
       "role": {
-        "side": 1
+        "side": 1,
+        "pos": 1
       }
     },
     {

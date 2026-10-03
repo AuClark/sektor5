@@ -86,6 +86,9 @@ class ShowClock {
 //
 // duty (0..1, default 0.5) is how much of a square's cycle is spent at the top. Down at 0.15 it
 // is a strobe rather than a chop, which is what the Launchpad's STROBE pad wants.
+// What the renderer keeps of a setting's schema: enough to clamp it, automate it and play it.
+const specOf = (p, timed) => ({ id: p.id, label: p.label || "", min: p.min, max: p.max, step: p.step, kind: p.kind || "",
+                                energy: p.energy, play: p.play, timed: !!(timed && timed.has(p.id)) });
 function autoHash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
 function autoEval(a, beat, inBar, time) {
   const t = (a.hz ? time : (a.retrig ? inBar : beat)) * (a.rate || 0) + (a.phase || 0);
@@ -102,6 +105,65 @@ function autoEval(a, beat, inBar, time) {
   }
   const lo = a.lo, hi = a.hi;
   return lo + (hi - lo) * v;
+}
+
+// ---------------------------------------------------------------- the knob player
+// With Play on (the visuals service's "play", on unless switched off) the renderer rides a
+// sketch's knobs with the song, on top of the values it holds, the way a VJ would. Every 4 or 8
+// bars some of them glide somewhere new, over a bar from the 1. The ones that make the picture
+// busier lean up through a build, sit at the top on the drop and come down through a breakdown;
+// the calming ones go the other way. It works from the beat and the show's scene alone, so every
+// surface and projector moves the same, it costs nothing on the network, and it never leaves a
+// knob's range (the orange band on the Visuals page). It leaves alone what would jump or break a
+// look: speeds and counts (a sketch works position out from beat x speed, so a new speed leaps),
+// switches and choices, "fixed" and "quality" settings, and a knob with its own automation on.
+// A sketch can opt a setting in or out with "play": true / false in its json.
+const PLAY_BUSY = new Set(["aamt", "bamt", "camt", "bounce", "dance", "noodle", "boil", "film", "glow",
+  "jitter", "twist", "zoom", "patscale", "detail", "density", "beat", "punch", "kal", "rosette", "burst",
+  "lines", "glitch", "rays", "surge", "lurch", "edge", "ember", "sparks", "amp", "warp", "bright"]);
+const PLAY_CALM = new Set(["fog", "bg", "swap", "far", "day", "climb"]);
+const PLAY_NOT = /speed|spd|spin|rate|drift|orbit|cycle|run\b|beats|count|steps|seed|style|mode|layout|sides|octave|per beat|per bar/i;
+function playable(p) {
+  if (!p || p.play === false) return false;
+  if (p.play === true) return true;
+  if (p.timed || p.kind === "rate" || p.kind === "quality" || p.kind === "fixed" || p.id === "follow" || !(p.max > p.min)) return false;
+  if (p.step && (p.step >= 1 || (p.max - p.min) / p.step < 20)) return false;      // switches, choices, counts
+  return !PLAY_NOT.test(p.id) && !PLAY_NOT.test(p.label || "");
+}
+// The settings a shader multiplies by the beat or the clock ("u_beat * p_scroll", "time * p_rot"): speeds by
+// another name, which leap when they change. Read out of the GLSL, so a new sketch is covered too.
+function timedIds(glsl, ids) {
+  const T = "(?:u_beat|u_time|time|beat|bb|tb|t)";
+  return new Set(ids.filter(id => new RegExp(`\\bp_${id}\\s*\\*\\s*${T}\\b|\\b${T}\\s*\\*\\s*p_${id}\\b`).test(glsl || "")));
+}
+const playDir = p => p.energy !== undefined ? p.energy : PLAY_BUSY.has(p.id) ? 1 : PLAY_CALM.has(p.id) ? -1 : 0;
+function playHash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; }
+
+// Where the song wants the busy knobs: -1 (deep in a breakdown) .. 1 (the drop).
+function songPush(f) {
+  switch (f.scene) {
+    case SCENES.DROP: return 1 - 0.5 * Math.min(1, (f.since || 0) / 64);
+    case SCENES.PREDROP: return 0.85;
+    case SCENES.BUILD: case SCENES.HOLD: return -0.3 + 1.1 * (f.progress || 0);
+    case SCENES.BREAKDOWN: return -0.6 - 0.2 * (1 - (f.sp || 0));
+    case SCENES.INTRO: case SCENES.OUTRO: return -0.45;
+    case SCENES.GROOVE: return 0.9 * ((f.energy ?? 0.5) - 0.5);
+    default: return -0.3;
+  }
+}
+
+// One knob's value: its held value, moved by the phrase and the song. bb is the beat counted
+// from a downbeat (multiples of 4 are the 1s); push is songPush, smoothed; amount 0..1.
+function playEval(p, key, base, lo, hi, bb, push, amount) {
+  const seed = playHash(key);
+  const per = seed < 0.5 ? 16 : 32;                                  // this knob moves every 4 or every 8 bars
+  const k = Math.floor(bb / per), x = (bb - k * per) / 4;            // bars into its phrase
+  const tgt = n => 2 * autoHash(seed * 977 + n) - 1;
+  const g = Math.min(1, Math.max(0, x)), u = g * g * (3 - 2 * g);    // the glide, over the phrase's first bar
+  const w = tgt(k - 1) + (tgt(k) - tgt(k - 1)) * u;
+  const dir = playDir(p), span = hi - lo;
+  const off = amount * span * (dir ? 0.2 * w + 0.3 * dir * push : 0.3 * w);   // Wild: up to half the range
+  return Math.max(lo, Math.min(hi, base + off));
 }
 
 // ---------------------------------------------------------------- homography
@@ -523,6 +585,8 @@ class MapRenderer {
     this.genSpec = {};        // id -> {min, max, step, kind} out of the sketch's schema
     this.genLive = {};        // what the shader actually gets: genParams with automation applied
     this.genFreeze = false;   // hold every automated value where it is (the page's Freeze)
+    this.genPlay = { on: true, amount: 0.5 };   // the knob player (see playEval), from the visuals service
+    this._push = null;        // songPush, smoothed so a new section leans in rather than jumps
     this._frz = null;
     this.lastFrame = null;    // the clock frame this draw used, for pages that want to read it
     this.genError = null;
@@ -592,9 +656,9 @@ class MapRenderer {
     this.liveSketch = sk.name;
     try {
       const ids = sk.groups.flatMap(g => g.params.map(p => p.id));
-      const spec = {};
+      const spec = {}, timed = timedIds(sk.glsl, ids);
       for (const g of sk.groups) for (const p of g.params)
-        spec[p.id] = { min: p.min, max: p.max, step: p.step, kind: p.kind || "" };
+        spec[p.id] = specOf(p, timed);
       const prog = this._program(COMMON + sk.glsl, ids.map(id => "p_" + id));
       prog.ids = ids; prog.name = sk.name; prog.climax = sk.climax || null;
       if (trans && this.progs.gen) this._beginTrans(trans);          // before genSpec changes: the outgoing keeps its own
@@ -655,13 +719,18 @@ class MapRenderer {
 
   // What a "gen" surface draws: the live sketch, or its own one (loaded on first use; nothing until then).
   // The live one gets genLive -- the held values with this frame's automation on top. A surface
-  // pinned to its own sketch gets the plain values it was fetched with: automation belongs to the
-  // sketch the Visuals page is driving, and there is only one set of it.
+  // pinned to its own sketch gets the values it was fetched with, ridden by the knob player (its
+  // automation belongs to the sketch the Visuals page is driving, and there is only one set of it).
   sketchFor(s) {
     if (!s.sketch || s.sketch === this.liveSketch) return this.progs.gen ? { prog: this.progs.gen, values: this.genLive } : null;
     const key = s.sketch + "|" + (s.preset || ""), e = this.sketches[key];
     if (!e) this._loadSketch(s.sketch, s.preset, key);
-    return e && e.prog ? e : null;
+    if (!e || !e.prog) return null;
+    if (e.frame !== this._frameNo) {                    // once a frame, however many surfaces show it
+      e.frame = this._frameNo;
+      if (this.lastFrame) this._automate(e.live, e.values, {}, e.spec, this.lastFrame, this._now, e.prog.name);
+    }
+    return { prog: e.prog, values: e.live };
   }
 
   async _loadSketch(name, preset, key) {
@@ -674,7 +743,9 @@ class MapRenderer {
       const ids = sk.groups.flatMap(g => g.params.map(p => p.id));
       const prog = this._program(COMMON + sk.glsl, ids.map(id => "p_" + id));
       prog.ids = ids; prog.name = sk.name; prog.climax = sk.climax || null;
-      this.sketches[key] = { prog, values };
+      const spec = {}, timed = timedIds(sk.glsl, ids);
+      for (const g of sk.groups) for (const p of g.params) spec[p.id] = specOf(p, timed);
+      this.sketches[key] = { prog, values, spec, live: { ...values } };
     } catch (e) {
       console.error("sketch", name, e);
       this.sketches[key] = { error: String(e) };
@@ -740,7 +811,7 @@ class MapRenderer {
     if (!L) return;
     this.clock.lead = L.lead_ms ?? 60;
     const f = this.clock.frame(now);
-    this.lastFrame = f;
+    this.lastFrame = f; this._now = now; this._frameNo = (this._frameNo || 0) + 1;
     this._genFrame(f, now);
     this._updateTitle();
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -883,12 +954,19 @@ class MapRenderer {
   // The live parameter values for this frame: the held values, with automation moved on top.
   // Once per frame and shared by every surface, so a layout with six of them costs the same.
   _genFrame(f, now) {
-    this._automate(this.genLive, this.genParams, this.genAuto, this.genSpec, f, now);
+    // The song's push on the knobs, eased over about 2 beats; the drop lands at once. Freeze holds it.
+    const want = songPush(f), P = this._push;
+    if (!this.genFreeze) {
+      const dt = P ? f.beat - P.beat : -1;
+      if (!P || dt < 0 || dt > 16 || (f.scene === SCENES.DROP && f.since < 0.5)) this._push = { v: want, beat: f.beat };
+      else { P.v += (want - P.v) * (1 - Math.exp(-dt / 2)); P.beat = f.beat; }
+    }
+    this._automate(this.genLive, this.genParams, this.genAuto, this.genSpec, f, now, this.liveSketch);
     const T = this.trans;
-    if (T) this._automate(T.out.live, T.out.params, T.out.auto, T.out.spec, f, now);
+    if (T) this._automate(T.out.live, T.out.params, T.out.auto, T.out.spec, f, now, T.out.prog && T.out.prog.name);
   }
 
-  _automate(live, params, A, S, f, now) {
+  _automate(live, params, A, S, f, now, name = "") {
     for (const id in params) live[id] = params[id];
     // The beat counter shifted so downbeats are multiples of 4, same as barBeat() in the
     // shaders, so "retrigger on bar" fires on the 1 and not wherever the track happened to start.
@@ -908,6 +986,16 @@ class MapRenderer {
       let v = autoEval(a, F ? F.beat : f.beat, F ? F.inBar : inBar, F ? F.t : t);
       if (s) v = Math.max(s.min, Math.min(s.max, v));    // never outside what the sketch allows
       live[id] = v;
+    }
+    const pl = this.genPlay;
+    if (!pl || !pl.on || !(pl.amount > 0)) return;
+    const pb = F ? F.beat - (f.beat - bb) : bb, push = this._push ? this._push.v : 0;
+    for (const id in params) {
+      const s = S[id], a = A[id];
+      if (!s || (a && a.on) || !playable(s)) continue;
+      const lo = a ? Math.max(s.min, a.lo) : s.min, hi = a ? Math.min(s.max, a.hi) : s.max;
+      if (!(hi > lo)) continue;
+      live[id] = playEval(s, name + "|" + id, params[id], lo, hi, pb, push, pl.amount);
     }
   }
 
@@ -931,7 +1019,7 @@ class MapRenderer {
       });
       const k = s.corners.length, cx = s.corners.reduce((a, c) => a + c[0], 0) / k * W, cy = s.corners.reduce((a, c) => a + c[1], 0) / k * H;
       o.fillStyle = sel ? "#2fe6ff" : "#fff"; o.textAlign = "center";
-      o.fillText(`${s.name || s.id} · ${s.content === "gen" && s.sketch ? s.sketch + (s.preset ? " · " + s.preset : "") : s.content}`, cx, cy);
+      o.fillText(`${s.name || s.id} · ${s.content !== "gen" ? s.content : s.sketch ? s.sketch + (s.preset ? " · " + s.preset : "") : "focus"}`, cx, cy);
     }
     for (const m of L.masks) {
       if (!mine(m)) continue;
@@ -1014,6 +1102,7 @@ function connectEvents(renderer, { onLayout, onScreen, onScreens, onStatus, onSk
       else if (m.t === "auto") {
         renderer.genAuto = m.auto || {};
         renderer.genFreeze = !!m.freeze;
+        if (m.play) renderer.genPlay = m.play;
         onAuto && onAuto(renderer.genAuto, renderer.genFreeze);
       }
       else if (m.t === "wave") renderer.setWave(m.wave);

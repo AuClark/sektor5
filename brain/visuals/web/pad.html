@@ -179,8 +179,8 @@
 <script src="vj.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-// Back goes where you came from: Live (show.html) or the full Visuals page.
-if (/\/show\.html/.test(document.referrer)) { const b = document.querySelector(".backlink"); b.href = document.referrer; b.title = "Back to Live"; b.querySelector(".long").textContent = " Live"; }
+// Back goes where you came from: Focus (show.html) or the full Visuals page.
+if (/\/show\.html/.test(document.referrer)) { const b = document.querySelector(".backlink"); b.href = document.referrer; b.title = "Back to Focus"; b.querySelector(".long").textContent = " Focus"; }
 let SK = null, V = {}, AU = {}, FREEZE = false, PRESETS = [], live = "", grpIdx = 0, dragging = 0;
 // Effects state. FOCUS is the one parameter the effect pads play; strobe and sweep are in note
 // values like everything else. `ramp` is a sweep in progress, in beat time.

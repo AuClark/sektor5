@@ -17,7 +17,7 @@ A projector running Chrome, showing the brain's projection-mapping page full-scr
 2. Open `/edit` on your phone. Turn on **Handles on wall** so the corner dots show on the wall too.
 3. For each wall, panel or object: **+ Surface** (four corners) or **+ Triangle** (three: the apex, then the base right and base left, for the faces of a pyramid), then drag its corner dots onto the real corners. A triangle shows its content's square cropped to the triangle, apex at the top centre. **+ Diamond** (four corners: top, right, bottom, left) keeps the picture upright and centred and crops it to the diamond (the square's edge midpoints land on the diamond's corners), so a sketch doesn't turn 45° the way it would on a rotated four-corner surface. Each corner has its own colour: red top-left, green top-right, blue bottom-right, yellow bottom-left. Drag inside a surface to move it. On a laptop, arrow keys nudge the selected corner by 1 px (Shift = 10 px); **Next corner** picks which one.
 4. **Test pattern** on: every surface shows a grid, border and circle. Adjust until the lines look straight and the circle round on the real surface.
-5. Pick each surface's **content**, and draw **masks** over anything that shouldn't be lit (doorways, the DJ, speakers): **+ Draw mask**, tap points around it, then **Finish mask**.
+5. Pick what each surface shows (the picker on its row under **Surfaces**), and draw **masks** over anything that shouldn't be lit (doorways, the DJ, speakers): **+ Draw mask**, tap points around it, then **Finish mask**.
 6. Set **Latency compensation** with the Test pattern still on: its centre circle flashes on every beat (red on beat 1). Move the slider until the flash lands on the kick, by ear, or film the projection next to a deck's beat counter in slow motion. Then turn off Handles and Test pattern, and **Save** a preset (e.g. `workshop-back-wall`).
 
 Layouts are saved on the brain in `~/projector/layouts/`: `current.json` plus presets. They aren't in git.
@@ -43,7 +43,9 @@ On site, the real projector needs the same position, aim and throw as in the Sta
 | `title` | Current track title, glowing on the beat |
 | `solid` | Key colour |
 | `test` | Alignment grid for that surface |
-| `gen` (generative) | The live sketch from the [visuals service](../visuals.md) on :8110, reshaped live from its control page |
+| `gen` (generative) | **Focus**: the look the [visuals service](../visuals.md) on :8110 is playing (the Visuals page, Shuffle), or a sketch of its own |
+
+**Picking it:** every surface on the projector has one row under **Surfaces** with its name and a single picker: **Focus** first, then every sketch by theme (by title), then the built-in contents at the bottom (**Built in**: Lights' colours = `show`, Beat flash, Tunnel, Bars, Track name, Solid colour, Test grid). A surface given its own sketch gets a second picker for its preset (**As last left** = the values it was last left at on the Visuals page). So which sketch is on which surface reads at a glance, and changes in one tap. The handles on the preview label each surface the same way.
 
 Every surface has its own opacity and hue shift, so neighbouring surfaces can use complementary colours.
 
@@ -72,5 +74,5 @@ Every surface has its own opacity and hue shift, so neighbouring surfaces can us
 ## Several projectors, and a sketch per surface
 
 - **Projectors:** the editor's projector picker (on the strip under the preview) adds, renames and removes projectors. Each surface and mask belongs to the projector that was picked when it was made. Open each projector's output page with its id: `http://sektor5.local:8100/?p=right` (hover the picker for the exact address; the first projector needs no `?p`). The preview takes each projector's own screen size, and each reports its own frame rate.
-- **A sketch per surface:** a surface with content **generative sketch** shows **Live** (whatever the Visuals page is showing) or a sketch of its own, optionally with one of that sketch's **presets**. A sketch of its own runs with the values it was last left at on the Visuals page (or the preset's). Tweaks on the Visuals page show straight away on every surface using the sketch that's live there.
+- **A sketch per surface:** a surface shows **Focus** (whatever the Visuals page is showing) or a sketch of its own, optionally with one of that sketch's **presets**. A sketch of its own runs with the values it was last left at on the Visuals page (or the preset's), ridden by the knob player when it's on ([visuals-live.md](../visuals-live.md#play-the-knobs)). Tweaks on the Visuals page show straight away on every surface using the sketch that's live there.
 - **Cost:** the projector's GPU pays for each surface's pixels times how heavy its sketch is, not for how many different sketches there are. Five sketches on five surfaces cost about the same as one sketch over the same area. Overlapping surfaces pay twice, and ray-marched sketches (diamond, horizon…) are the heavy ones. Loading a sketch compiles it once (a brief hitch). Render resolution *auto* covers slowdowns.
