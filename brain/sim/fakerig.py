@@ -495,6 +495,9 @@ class H(BaseHTTPRequestHandler):
             return self.send(200, '{"enabled": false, "admin": true}')
         if p == "/api/system":
             return self.send(200, '{"ready": false}')
+        if p == "/api/sim":                              # the sound player (/shell) leaves when this isn't on
+            return self.send(200, json.dumps({"on": True, "available": True, "bpm": ARGS.bpm, "since": int(T0 * 1000),
+                                              "djlink": False, "decks": 2, "uptime_s": int(time.time() - T0)}))
         if p == "/api/state":
             return self.send(200, state_json())
         if p == "/api/events":

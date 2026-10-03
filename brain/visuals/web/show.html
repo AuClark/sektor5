@@ -513,7 +513,7 @@
         <div class="label">Colour</div>
         <div class="ringwrap">
           <div class="ringbox"><div class="ring" id="ring"></div><div class="dot" id="ringDot"></div><button class="mid" id="follow">Follow<br>the music</button></div>
-          <div class="ringside"><p id="colourNote">Colours follow the track's key.</p><button class="tile" id="cycle" style="min-height:64px">Cycle<small>Slowly through them all</small></button></div>
+          <div class="ringside"><p id="colourNote">Colours follow the track's key.</p><button class="tile" id="cycle" style="min-height:64px">Cycle<small>Slowly through them all</small></button><button class="tile" id="fromvis" style="min-height:64px">From the visuals<small>The lights take the picture's main colour</small></button></div>
         </div>
       </div>
     </div>
@@ -698,6 +698,7 @@ function placeDot(h, show) {
 }
 $("follow").onclick = () => cmd("palette", { mode: "auto" }, "Colour");
 $("cycle").onclick = () => cmd("palette", { mode: S.palette && S.palette.mode === "cycle" ? "auto" : "cycle" }, "Colour");
+$("fromvis").onclick = () => cmd("palette", { mode: S.palette && S.palette.mode === "visuals" ? "auto" : "visuals" }, "Colour");
 
 // Levels: drag anywhere on the bar. While a finger is on it, the live value doesn't fight it.
 function level(el, onSet) {
@@ -720,6 +721,7 @@ function overrides() {
   if (S.look) o.push(`${{ INTRO: "Ambient", GROOVE: "Groove", BREAKDOWN: "Break", DROP: "Drop" }[S.look]} scene`);
   if (S.palette && S.palette.mode === "lock") o.push("colour locked");
   if (S.palette && S.palette.mode === "cycle") o.push("colour cycling");
+  if (S.palette && S.palette.mode === "visuals") o.push("colour from the visuals");
   if (S.speed && S.speed !== 1) o.push(`${S.speed}× speed`);
   if (S.mode === "blackout") o.push("blackout");
   else if (S.mode === "manual") o.push("manual");
@@ -751,7 +753,8 @@ function renderLights() {
   const pm = S.palette ? S.palette.mode : "auto";
   $("follow").classList.toggle("on", pm === "auto");
   $("cycle").classList.toggle("on", pm === "cycle");
-  $("colourNote").textContent = pm === "lock" ? "Locked to this colour. Tap the middle to hand it back." : pm === "cycle" ? "Cycling through every colour." : "Colours follow the track's key.";
+  $("fromvis").classList.toggle("on", pm === "visuals");
+  $("colourNote").textContent = pm === "lock" ? "Locked to this colour. Tap the middle to hand it back." : pm === "cycle" ? "Cycling through every colour." : pm === "visuals" ? (S.visual ? "Following the projected picture's main colour." : "Waiting for the projector page (no colour from it yet): following the track's key.") : "Colours follow the track's key.";
   if (!ringBusy) placeDot(S.palette ? S.palette.hue : 0, pm === "lock");
   showLights(S.intensity);
   if (S.hue != null) document.body.style.setProperty("--glow", `hsla(${Math.round(S.hue * 360)},100%,55%,${(0.18 + 0.3 * (S.energy ?? 0.5)).toFixed(2)})`);

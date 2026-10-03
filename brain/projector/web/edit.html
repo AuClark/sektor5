@@ -148,7 +148,7 @@
     <div class="card">
       <h3>Surfaces</h3>
       <div class="list" id="surfaces"></div>
-      <div class="row" style="margin-top:8px"><button id="bAdd">+ Surface</button><button id="bAddTri" title="A triangle: three corners (apex, base right, base left), e.g. a face of a pyramid">+ Triangle</button><button id="bDup">Duplicate</button><button id="bDel" class="warn">Delete</button></div>
+      <div class="row" style="margin-top:8px"><button id="bAdd">+ Surface</button><button id="bAddTri" title="A triangle: three corners (apex, base right, base left), e.g. a face of a pyramid">+ Triangle</button><button id="bAddDia" title="A diamond: four corners (top, right, bottom, left). The picture stays upright and centred, cropped to the diamond">+ Diamond</button><button id="bDup">Duplicate</button><button id="bDel" class="warn">Delete</button></div>
     </div>
     <div class="card" id="props">
       <h3>Selected surface</h3>
@@ -346,6 +346,12 @@ $("bAddTri").onclick = () => {
                     corners: [[0.5 + o, 0.3 + o], [0.7 + o, 0.7 + o], [0.3 + o, 0.7 + o]] });
   L.selected = id; push(true); ui();
 };
+$("bAddDia").onclick = () => {
+  const id = newId("s", L.surfaces), o = 0.04 * (L.surfaces.length % 5);
+  L.surfaces.push({ id, name: `Diamond ${L.surfaces.filter(s => s.shape === "diamond").length + 1}`, content: "show", opacity: 1, hue_shift: 0, projector: curId(),
+                    shape: "diamond", corners: [[0.5 + o, 0.25 + o], [0.7 + o, 0.5 + o], [0.5 + o, 0.75 + o], [0.3 + o, 0.5 + o]] });
+  L.selected = id; push(true); ui();
+};
 $("bDup").onclick = () => {
   const s = sel(); if (!s) return;
   const id = newId("s", L.surfaces);
@@ -353,9 +359,9 @@ $("bDup").onclick = () => {
   L.selected = id; push(true); ui();
 };
 $("bDel").onclick = () => { const s = sel(); if (!s) return; L.surfaces = L.surfaces.filter(x => x !== s); L.selected = null; push(true); ui(); };
-const tri = s => s.corners.length === 3;
-$("bFill").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0], [1, 1], [0, 1]] : [[0, 0], [1, 0], [1, 1], [0, 1]]; push(true); } };
-$("bReset").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0.25], [0.75, 0.75], [0.25, 0.75]] : [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]]; push(true); } };
+const tri = s => s.corners.length === 3, dia = s => s.shape === "diamond";
+$("bFill").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0], [1, 1], [0, 1]] : dia(s) ? [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]] : [[0, 0], [1, 0], [1, 1], [0, 1]]; push(true); } };
+$("bReset").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0.25], [0.75, 0.75], [0.25, 0.75]] : dia(s) ? [[0.5, 0.25], [0.75, 0.5], [0.5, 0.75], [0.25, 0.5]] : [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]]; push(true); } };
 $("bSel").onclick = () => { const s = sel(); selCorner = (selCorner + 1) % (s ? s.corners.length : 4); };
 $("pName").oninput = e => { const s = sel(); if (s) { s.name = e.target.value; push(); renderLists(); } };
 $("pContent").onchange = e => { const s = sel(); if (s) { s.content = e.target.value; push(true); renderLists(); ui(); } };

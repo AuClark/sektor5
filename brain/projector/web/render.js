@@ -5,7 +5,9 @@
 // (0..1, y down), or a triangle given by three (apex, base right, base left: for the faces of a
 // pyramid). Content is drawn per pixel through the inverse homography of that quad, so it lands
 // with correct perspective on angled surfaces; a triangle shows the content's square cropped to
-// the triangle, apex at the top centre (an affine map, exact for a flat face). Masks are black
+// the triangle, apex at the top centre (an affine map, exact for a flat face). A diamond (four corners:
+// top, right, bottom, left; "shape": "diamond") shows the content's square upright and centred, cropped to
+// the diamond: the square's edge midpoints land on its corners. Masks are black
 // polygons drawn on top. All content is beat-locked to the show engine's state.
 // Surfaces can have rounded corners and a border band drawn over their content.
 // Content "gen" is a generative sketch from the visuals service (:8110): the live one (whatever the
@@ -24,17 +26,26 @@ const SCENES = { IDLE: 0, INTRO: 1, GROOVE: 2, BREAKDOWN: 3, BUILD: 4, HOLD: 5, 
 // Updates arrive ~20x/s with network jitter, so the displayed beat doesn't snap to each one:
 // it runs at the track's tempo and eases towards the reported position (at most 10% faster
 // or slower), only jumping on a seek or track change.
+//
+// Timing: showbrain stamps each state (s.t, wall clock) and its beat is already s.lead_ms ahead, for the
+// LEDs' Wi-Fi delay. The page undoes that lead and counts the state's age from the stamp, so `lead`
+// (the layout's lead_ms) is purely this projector's own output delay (GPU, HDMI, the projector's
+// processing): calibrate it with the test card, whose centre flashes on the beat. A page whose clock
+// disagrees with showbrain's by more than a second (another machine without NTP) counts from arrival.
 class ShowClock {
-  constructor() { this.s = null; this.at = 0; this.lead = 60; this.titleVer = 0; this.title = ""; this.b = null; this.last = 0; }
+  constructor() { this.s = null; this.at = 0; this.age = 0; this.sbLead = 0; this.lead = 60; this.titleVer = 0; this.title = ""; this.b = null; this.last = 0; }
   update(s) {
     this.s = s; this.at = performance.now();
+    const age = s && s.t ? Date.now() - s.t * 1000 : NaN;
+    this.age = Number.isFinite(age) && age > -50 && age < 1000 ? Math.max(0, age) : 0;
+    this.sbLead = s && Number.isFinite(s.lead_ms) ? s.lead_ms : 0;
     const t = s && s.title ? s.title : "";
     if (t !== this.title) { this.title = t; this.titleVer++; }
   }
   // Everything the shaders need, extrapolated to "now + lead".
   frame(now) {
     const s = this.s;
-    const dtBeats = s && s.bpm ? ((now - this.at + this.lead) / 1000) * s.bpm / 60 : 0;
+    const dtBeats = s && s.bpm ? ((now - this.at + this.age - this.sbLead + this.lead) / 1000) * s.bpm / 60 : 0;
     if (!s || !s.live || !s.bpm) {
       this.b = null;
       const b = now / 500;                                  // 120 BPM idle clock
@@ -117,7 +128,18 @@ function squareToTri(c) {
   const fx = 0.5 * ex - (a[0] - l[0]), fy = 0.5 * ey - (a[1] - l[1]);   // (0, 1)
   return [ex, fx, l[0] - fx, ey, fy, l[1] - fy, 0, 0, 1];
 }
-const surfaceMatrix = c => c.length === 3 ? squareToTri(c) : squareToQuad(c);
+// A diamond: the content square's edge midpoints (0.5, 0), (1, 0.5), (0.5, 1), (0, 0.5) -> its top, right,
+// bottom and left corners (a homography, so it keeps perspective on an angled face).
+const DIAMOND_IN_SQUARE = invert3Lazy();
+function invert3Lazy() { let m = null; return () => m || (m = invert3(squareToQuad([[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]]))); }
+function mul3(a, b) {
+  const o = new Array(9);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+  return o;
+}
+const squareToDiamond = c => mul3(squareToQuad(c), DIAMOND_IN_SQUARE());
+const isDiamond = s => s.shape === "diamond" && s.corners.length === 4;
+const surfaceMatrix = (c, shape) => c.length === 3 ? squareToTri(c) : shape === "diamond" ? squareToDiamond(c) : squareToQuad(c);
 
 function invert3(m) {
   const [a, b, c, d, e, f, g, h, i] = m;
@@ -131,9 +153,10 @@ function invert3(m) {
 // Row-major 3x3 -> column-major Float32Array for uniformMatrix3fv.
 const colMajor = m => new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]);
 
-function quadSize(c, W, H) {
+function quadSize(c, W, H, shape) {
   const d = (p, q) => Math.hypot((p[0] - q[0]) * W, (p[1] - q[1]) * H);
   if (c.length === 3) return [d(c[1], c[2]), d(c[0], [(c[1][0] + c[2][0]) / 2, (c[1][1] + c[2][1]) / 2])];   // base, height
+  if (shape === "diamond") return [d(c[3], c[1]), d(c[0], c[2])];                                             // the diagonals
   return [(d(c[0], c[1]) + d(c[3], c[2])) / 2, (d(c[0], c[3]) + d(c[1], c[2])) / 2];
 }
 function quadAspect(c, W, H) {
@@ -161,6 +184,7 @@ uniform float u_todrop, u_cbeat;
 uniform float u_opacity, u_bright, u_sel, u_time;
 uniform float u_radius, u_border, u_bbright, u_bsat, u_bpulse;
 uniform float u_tri;   // 1: a triangle surface (apex at the top centre of the square)
+uniform float u_dia;   // 1: a diamond surface (the square's edge midpoints on its corners)
 uniform float u_px;   // one output pixel in surface units (surface height = 1), for anti-aliasing
 uniform sampler2D u_tex;
 // The live track's waveform, resampled per beat by the visuals service (trackwave.py).
@@ -356,6 +380,11 @@ void main() {
     sd = max(sd, (abs(sp.x) - 0.5 * u_aspect * (sp.y + 0.5)) / sqrt(1.0 + 0.25 * u_aspect * u_aspect));
     if (sd > 2.0 * u_px) discard;
   }
+  if (u_dia > 0.5) {           // inside the diamond: |x| / (w/2) + |y| / (h/2) <= 1, distance in the same units
+    vec2 dn = vec2(2.0 / u_aspect, 2.0);
+    sd = max(sd, (dot(abs(sp), dn) - 1.0) / length(dn));
+    if (sd > 2.0 * u_px) discard;
+  }
   float a = smoothstep(0.0, 1.5 * u_px, -sd) * u_opacity;
   vec2 cuv = u_trole > 0.5 ? s5t_uv(uv) : uv;
   vec3 c = content(cuv) * u_bright;
@@ -450,6 +479,8 @@ const CONTENT = {
   }`,
 };
 // Test card: grid, border, diagonals, centre circle, coloured corners (no derivative extension needed).
+// The centre flashes on every beat (red on the one) for an eighth of a beat (~60 ms): line it up with the kick by ear, or film
+// it next to a deck in slow motion, with the editor's latency slider.
 CONTENT.test = `vec3 content(vec2 uv) {
   vec2 g = abs(fract(uv * 10.0 + 0.5) - 0.5) * 10.0;
   float grid = step(min(g.x * u_aspect, g.y), 0.02);
@@ -458,6 +489,8 @@ CONTENT.test = `vec3 content(vec2 uv) {
   vec2 cp = (uv - 0.5) * vec2(u_aspect, 1.0);
   float circle = step(abs(length(cp) - 0.4), 0.004);
   vec3 c = vec3(0.35) * grid + vec3(1.0) * clamp(border + circle + diag * 0.6, 0.0, 1.0);
+  float flash = step(u_frac, 0.12) * step(length(cp), 0.4);                // the first eighth of the beat (~60 ms)
+  if (flash > 0.5) c = u_bwb < 1.5 ? vec3(1.0, 0.1, 0.1) : vec3(1.0);
   float m = 0.12;
   if (uv.x < m / u_aspect && uv.y < m) c = vec3(1.0, 0.0, 0.0);
   if (uv.x > 1.0 - m / u_aspect && uv.y < m) c = vec3(0.0, 1.0, 0.0);
@@ -663,7 +696,7 @@ class MapRenderer {
     const u = {};
     for (const n of ["u_res", "u_Hinv", "u_aspect", "u_beat", "u_frac", "u_bwb", "u_bar", "u_hue", "u_scene", "u_progress",
                      "u_since", "u_energy", "u_sp", "u_opacity", "u_bright", "u_sel", "u_time", "u_tex",
-                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri",
+                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri", "u_dia",
                      "u_wave", "u_wv", "u_wloop", "u_text", "u_textn", "u_trole", "u_tp", "u_tmode", "u_tseed", "u_tdur", "u_todrop", "u_cbeat", ...extra])
       u[n] = gl.getUniformLocation(p, n);
     return { p, u, a: gl.getAttribLocation(p, "a") };
@@ -807,11 +840,12 @@ class MapRenderer {
     gl.vertexAttribPointer(pr.a, 2, gl.FLOAT, false, 0, 0);
     const u = pr.u;
     gl.uniform2f(u.u_res, W, H);
-    gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners))));
+    gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners, s.shape))));
     gl.uniform1f(u.u_tri, s.corners.length === 3 ? 1 : 0);
+    gl.uniform1f(u.u_dia, isDiamond(s) ? 1 : 0);
     const xs = s.corners.map(c => c[0]), ys = s.corners.map(c => c[1]);
     gl.uniform4f(u.u_box, 2 * Math.min(...xs) - 1, 1 - 2 * Math.max(...ys), 2 * Math.max(...xs) - 1, 1 - 2 * Math.min(...ys));
-    const [qw, qh] = quadSize(s.corners, W, H);
+    const [qw, qh] = quadSize(s.corners, W, H, isDiamond(s) ? "diamond" : null);
     gl.uniform1f(u.u_aspect, qh > 1 ? qw / qh : 1);
     gl.uniform1f(u.u_px, 1 / Math.max(qh, 1));
     gl.uniform1f(u.u_beat, f.beat); gl.uniform1f(u.u_frac, f.frac); gl.uniform1f(u.u_bwb, f.bwb);

@@ -73,10 +73,51 @@ addEventListener("keydown", e => {
 });
 setTimeout(() => tap.classList.add("hidden"), 8000);
 
+// The picture's main colour, for the lights' Visuals palette (showbrain), from the first projector only:
+// a 32×18 copy of the frame just drawn (read in the same task, so the drawing buffer is still there), a
+// hue histogram weighted by saturation × brightness (dark and grey pixels don't count) and the strongest
+// hue. Too little colour on screen sends null: the lights hold the last colour, then after 5 s go back to the key.
+const CS = document.createElement("canvas"); CS.width = 32; CS.height = 18;
+const CX = CS.getContext("2d", { willReadFrequently: true });
+const BINS = 36;
+let colourT = 0;
+function sampleColour(now) {
+  if (now - colourT < 400) return;
+  colourT = now;
+  const first = R.layout && R.layout.projectors && R.layout.projectors[0];
+  if (PROJ && first && first.id !== PROJ) return;
+  CX.drawImage(R.cv, 0, 0, CS.width, CS.height);
+  const px = CX.getImageData(0, 0, CS.width, CS.height).data;
+  const hist = new Float32Array(BINS), sx = new Float32Array(BINS), sy = new Float32Array(BINS), ss = new Float32Array(BINS);
+  let total = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), c = mx - mn, s = mx ? c / mx : 0;
+    if (mx < 0.12 || s < 0.25) continue;
+    let h = mx === r ? ((g - b) / c) % 6 : mx === g ? (b - r) / c + 2 : (r - g) / c + 4;
+    h = ((h / 6) % 1 + 1) % 1;
+    const w = s * mx, k = Math.floor(h * BINS) % BINS, a = h * 2 * Math.PI;
+    hist[k] += w; sx[k] += w * Math.cos(a); sy[k] += w * Math.sin(a); ss[k] += w * s; total += w;
+  }
+  let best = -1, bw = 0;
+  for (let k = 0; k < BINS; k++) {
+    const w = hist[(k + BINS - 1) % BINS] + 2 * hist[k] + hist[(k + 1) % BINS];
+    if (w > bw) { bw = w; best = k; }
+  }
+  let body = { hue: null };
+  if (best >= 0 && total > 0.012 * CS.width * CS.height) {   // thin coloured lines on black still count
+    let x = 0, y = 0, w = 0, s = 0;
+    for (const k of [best - 1, best, best + 1]) { const j = (k + BINS) % BINS; x += sx[j]; y += sy[j]; w += hist[j]; s += ss[j]; }
+    body = { hue: (Math.atan2(y, x) / (2 * Math.PI) + 1) % 1, sat: s / w };
+  }
+  fetch(BASE + "/api/colour", { method: "POST", body: JSON.stringify(body) }).catch(() => {});
+}
+
 function frame(now) {
   if (lastT) fps += (1000 / Math.max(1, now - lastT) - fps) * 0.05;
   lastT = now;
   R.draw(now, { test: localTest, projector: PROJ });
+  try { sampleColour(now); } catch (e) { /* never let the colour readout stop the picture */ }
   if (!hud.classList.contains("hidden")) {
     const s = R.clock.s, L = R.layout;
     hud.textContent = (online ? "" : "NO CONNECTION TO BRAIN\n")

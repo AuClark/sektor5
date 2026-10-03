@@ -86,10 +86,10 @@ def strip(ctx, n, role, state):
             d = local * (n + 10) - np.arange(n)
             tail = np.where((d >= 0) & (d < 10), np.exp(-d / 3), 0)
             out = lerp(out, hsv(hue + 0.5, 0.6, fade)[None, :].repeat(n, 0), tail)
-        return out
+        return strip_after(ctx, n, role, x, frac, beat, kick, out) if s == "GROOVE" else out
 
     if s == "BREAKDOWN":
-        return strip_breakdown(ctx, n, role, state, x, beat)
+        return strip_after(ctx, n, role, x, frac, beat, kick, strip_breakdown(ctx, n, role, state, x, beat))
 
     if s in ("BUILD", "HOLD"):
         p = ctx["progress"]
@@ -104,15 +104,88 @@ def strip(ctx, n, role, state):
         return np.zeros((n, 3), np.float32)
 
     if s == "DROP":
-        sd = ctx["since_drop"]
-        if sd < 0.25:
-            return np.ones((n, 3), np.float32)
-        strobe = sd < 4 and ((sd * 2) % 1.0) > 0.5
-        v = 0.0 if strobe else 0.35 + 0.65 * kick
-        blocks = ((np.arange(n) // 6) + int(sd) + (1 if role.get("flip") else 0)) % 2
-        return hsv(hue + 0.5 * blocks + flip * 0, 1.0, v)
+        return strip_drop(ctx, n, role, x, frac, bwb, beat, kick)
 
     return np.zeros((n, 3), np.float32)
+
+
+def post_drop(ctx):
+    """(beats since the last drop ended, the drop's length in beats) for the 8 bars after a drop, else None."""
+    span = ctx.get("drop_bars", 16) * 4
+    for d in reversed(ctx.get("drops") or []):
+        since = ctx["beat"] - ((d["bar"] - 1) * 4 + 1) - span
+        if since >= 0:
+            return (since, span) if since < 32 else None
+    return None
+
+
+def strip_after(ctx, n, role, x, frac, beat, kick, out):
+    """The 8 bars after a drop, fading into the section's own look: in a groove, a comet up the tube
+    every beat (the tubes in opposite directions) and a harder kick; in a breakdown, the drop's
+    colours falling as embers over a half-time pulse."""
+    pd = post_drop(ctx)
+    if pd is None:
+        return out
+    amt = (1 - pd[0] / 32) ** 1.5
+    hue, flip = ctx["hue"], 0.5 if role.get("flip") else 0.0
+    if ctx["scene"] == "GROOVE":
+        head = frac * 1.25
+        d = (head - x) if not role.get("flip") else (head - (1 - x))
+        tail = np.where((d >= 0) & (d < 0.2), np.exp(-d * 18), 0.0) * amt
+        punch = hsv(hue + flip, 1.0, kick * 0.6 * amt)[None, :]
+        return np.maximum(lerp(out, np.ones(3, np.float32)[None, :].repeat(n, 0), tail), punch)
+    pulse = math.exp(-5 * (beat % 2)) * amt                # beats 1 and 3
+    glow = hsv(hue + 0.5 * (x > 0.5) + flip, 1.0, 0.4 * pulse * (0.3 + 0.7 * x))
+    embers = np.zeros(n, np.float32)
+    for k in range(5):                                     # falling a tube's height every 4 beats
+        pos = 1 - ((beat / 4 + k / 5 + role.get("index", 0) * 0.1) % 1.0)
+        embers += np.exp(-np.abs(x - pos) * 40)
+    ember = hsv(hue + 0.5 + flip, 0.6, np.clip(embers, 0, 1) * 0.8 * amt)
+    return np.maximum(np.maximum(out, glow), ember).astype(np.float32)
+
+
+def strip_drop(ctx, n, role, x, frac, bwb, beat, kick):
+    """The drop climbs through four 4-bar phases instead of settling after the first bar:
+    slam (kick hits, colour blocks racing up), chase (comets, the tubes on opposite beats),
+    split (bursts from the middle, colours flip every bar, white on 2 and 4) and peak (a
+    16th-note strobe that sweeps white over the last two beats into what comes next)."""
+    sd, hue = ctx["since_drop"], ctx["hue"]
+    flip = 0.5 if role.get("flip") else 0.0
+    if sd < 0.25:
+        return np.ones((n, 3), np.float32)
+    if sd < 4:                                             # the first bar: the strobe
+        on = ((sd * 2) % 1.0) <= 0.5
+        blocks = ((np.arange(n) // 6) + int(sd) + (1 if role.get("flip") else 0)) % 2
+        return hsv(hue + 0.5 * blocks, 1.0, (0.35 + 0.65 * kick) if on else 0.0)
+    if sd < 16:                                            # slam
+        blocks = ((np.arange(n) - int(beat * 8)) // 6 + (1 if role.get("flip") else 0)) % 2
+        return hsv(hue + 0.5 * blocks, 1.0, 0.25 + 0.75 * kick)
+    if sd < 32:                                            # chase
+        base = hsv(hue + flip + 0.05 * x, 1.0, 0.1 + 0.35 * kick)
+        f = (frac + (0.5 if role.get("flip") else 0.0)) % 1.0
+        out = base
+        for k in (0.0, 0.5):                               # two comets a beat
+            head = ((f + k) % 1.0) * 1.3
+            pos = head if not role.get("flip") else 1 - head
+            d = (pos - x) if not role.get("flip") else (x - pos)
+            tail = np.where((d >= 0) & (d < 0.25), np.exp(-d * 14), 0.0)
+            out = lerp(out, np.ones(3, np.float32)[None, :].repeat(n, 0), tail)
+        return out
+    if sd < 48:                                            # split
+        bar_hue = hue + 0.5 * (int(sd // 4) % 2) + flip
+        r = np.abs(x - 0.5) * 2
+        ring = np.clip(1 - np.abs(r - frac * 1.2) * 6, 0, 1)
+        out = hsv(bar_hue + 0.08 * r, 1.0, 0.15 + 0.45 * kick + 0.6 * ring)
+        if bwb in (2, 4) and frac < 0.12:                  # white hit on the snare
+            out = lerp(out, np.ones((n, 3), np.float32), 1 - frac / 0.12)
+        return out
+    # peak: 16th gate, hue moving every beat, then a white sweep from the bottom over the last 2 beats
+    gate = ((beat * 4) % 1.0) < 0.5
+    out = hsv(hue + 0.25 * (int(beat) % 4) + flip + 0.1 * x, 1.0, (0.4 + 0.6 * kick) if gate else 0.05)
+    left = ctx.get("drop_bars", 16) * 4 - sd
+    if left < 2:
+        out = np.where((x <= 1 - left / 2)[:, None], 1.0, out).astype(np.float32)
+    return out
 
 
 # ---------------------------------------------------------------- leg pyramids
@@ -185,13 +258,7 @@ def pyramid(ctx, n, role, state):
             front = 1 - sd
             out = np.where((x >= front)[..., None], white, hsv(hue, 1, 0.1)) + 0 * order[..., None]
         else:
-            alt = (order % 2) * 0.5                    # alternate legs in the complementary colour
-            base = hsv(hue + alt, 1.0, 0.5 + 0.5 * kick)
-            ring = np.clip(1 - np.abs((1 - x) - frac) * 7, 0, 1)
-            if sd >= 16:                               # after 4 bars: a white highlight turns round the legs, a leg a beat
-                lit = (int(beat) % 2 == 0) if mir else (order == (int(beat) % st))   # mirrored: every other beat
-                ring = np.maximum(ring, lit * (0.35 + 0.4 * kick) * np.ones_like(x))
-            out = lerp(base, white[None, None, :], ring * 0.75)
+            out = pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st)
         # The laser comes on with the drop: held for the first bar, then on the kick, then on the one.
         laser = 1.0 if sd < 4 else (1.0 if frac < 0.5 else 0.0) if sd < 32 else (1.0 if bwb == 1 and frac < 0.5 else 0.0)
     elif s == "BREAKDOWN":
@@ -202,7 +269,7 @@ def pyramid(ctx, n, role, state):
         head = 1 - (beat / 8) % 1.0
         glow = np.exp(-np.abs(sp - head) * 30) * 0.5
         lvl = (0.1 + 0.3 * breathe) * (0.5 + 0.5 * x) + glow
-        out = hsv(hue + 0.5 + 0.1 * x, 0.8 - 0.4 * glow, lvl)
+        out = pyramid_after(ctx, order, x, frac, beat, kick, mir, st, hsv(hue + 0.5 + 0.1 * x, 0.8 - 0.4 * glow, lvl))
     elif s in ("INTRO", "OUTRO", "PAUSED"):
         fade = {"PAUSED": 0.4, "OUTRO": 0.8}.get(s, 1.0)
         breathe = 0.5 - 0.5 * math.cos(beat * math.pi / 4)
@@ -222,8 +289,65 @@ def pyramid(ctx, n, role, state):
             d = headp - sp
             tail = np.where((d >= 0) & (d < 0.12), np.exp(-d * 30), 0.0)
         out = lerp(base, hsv(hue + 0.5, 0.35, 1.0)[None, None, :], tail * 0.9)
-    legs = np.broadcast_to(np.asarray(out, np.float32), (4, n, 3)).reshape(4 * n, 3)   # a look can be one leg tall
+        if s == "GROOVE":
+            out = pyramid_after(ctx, order, x, frac, beat, kick, mir, st, out)
+    legs =np.broadcast_to(np.asarray(out, np.float32), (4, n, 3)).reshape(4 * n, 3)   # a look can be one leg tall
     return np.vstack([legs, np.full((1, 3), laser, np.float32)])
+
+
+def pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st):
+    """After the burst, four 4-bar phases: slam (a ring falls from the apex every beat over
+    alternating colours), rockets (white heads shoot from the feet to the apex, round the legs
+    unless they're mirrored), bounce (the legs fill to the kick like a level meter, the colour
+    flipping every bar, a white cap on top) and peak (a 16th-note strobe, then white fills from
+    the feet over the last two beats)."""
+    sd, hue = ctx["since_drop"], ctx["hue"]
+    white = np.ones(3, np.float32)
+    alt = (order % 2) * 0.5
+    if sd < 16:                                            # slam
+        base = hsv(hue + alt, 1.0, 0.5 + 0.5 * kick)
+        ring = np.clip(1 - np.abs((1 - x) - frac) * 7, 0, 1)
+        return lerp(base, white[None, None, :], ring * 0.75)
+    if sd < 32:                                            # rockets
+        base = hsv(hue + alt + 0.1 * x, 1.0, 0.15 + 0.4 * kick)
+        sp = _spiral(order, x, turns=1, mirrored=mir, stations=st)
+        head = min(1.0, frac * 2) * 1.1
+        d = head - sp
+        tail = np.where((d >= 0) & (d < 0.3), np.exp(-d * 10), 0.0)
+        return lerp(base, white[None, None, :], tail)
+    if sd < 48:                                            # bounce
+        level = 0.25 + 0.75 * kick
+        bar_hue = hue + 0.5 * (int(sd // 4) % 2) + alt
+        on = x <= level
+        cap = np.clip(1 - np.abs(x - level) * 25, 0, 1)
+        out = np.where(on[..., None], hsv(bar_hue + 0.1 * x, 1.0, 0.3 + 0.7 * x), 0.0) + 0 * order[..., None]
+        return lerp(out, white[None, None, :], cap)
+    gate = ((beat * 4) % 1.0) < 0.5                        # peak
+    out = hsv(hue + 0.25 * (int(beat) % 4) + alt + 0.1 * x, 1.0, (0.45 + 0.55 * kick) if gate else 0.05)
+    left = ctx.get("drop_bars", 16) * 4 - sd
+    if left < 2:
+        out = np.where((x <= 1 - left / 2)[..., None], white, out)
+    return out
+
+
+def pyramid_after(ctx, order, x, frac, beat, kick, mir, st, out):
+    """The 8 bars after a drop, fading into the section's look: in a groove, a rocket from the feet
+    every beat and the whole pyramid on the kick; in a breakdown, a ring falling from the apex
+    every two beats in the drop's colours."""
+    pd = post_drop(ctx)
+    if pd is None:
+        return out
+    amt = (1 - pd[0] / 32) ** 1.5
+    hue, white = ctx["hue"], np.ones(3, np.float32)
+    if ctx["scene"] == "GROOVE":
+        sp = _spiral(order, x, turns=1, mirrored=mir, stations=st)
+        d = frac * 1.2 - sp
+        tail = np.where((d >= 0) & (d < 0.25), np.exp(-d * 12), 0.0) * amt
+        punch = hsv(hue + (order % 2) * 0.5, 1.0, kick * 0.5 * amt * (0.4 + 0.6 * x))
+        return np.maximum(lerp(out, white[None, None, :], tail), punch)
+    ph = (beat % 2) / 2
+    ring = np.clip(1 - np.abs((1 - x) - ph * 1.1) * 8, 0, 1) * amt
+    return np.maximum(out, hsv(hue + (order % 2) * 0.5, 0.7, ring * 0.9))
 
 
 # ---------------------------------------------------------------- panel

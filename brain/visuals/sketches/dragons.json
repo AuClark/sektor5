@@ -1,0 +1,41 @@
+{
+  "title": "Dragon duel",
+  "about": "A red fire dragon and a blue ice dragon, long eastern serpents with horns, whiskers, manes, fins and little clawed legs, swirl round each other in a tilted orbit. Every four bars they take turns: the red one breathes fire, the blue one breathes ice, a bar of swirling, then both at once and the blasts clash in the middle in a burst of steam and sparks, all pulsing on the kick. Through a build the orbit tightens and speeds up and the breaths come twice as often; on the drop (and on its own every few bars) they curl into a heart and kiss nose to nose in a burst of purple light. Breakdowns go slow and dreamy.",
+  "climax": {"cycle": "every", "peak": "1 - 8 / every", "lock": "droplock", "what": "the kiss"},
+  "groups": [
+    {"name": "Dance", "params": [
+      {"id": "orbit",  "label": "Bars per orbit",            "min": 2,   "max": 32,  "step": 1,     "default": 8},
+      {"id": "radius", "label": "Orbit size",                "min": 0.3, "max": 1.6, "step": 0.01,  "default": 1},
+      {"id": "tilt",   "label": "Orbit tilt (3D)",           "min": 0.2, "max": 1,   "step": 0.01,  "default": 0.55},
+      {"id": "wave",   "label": "Slither",                   "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "size",   "label": "Size",                      "min": 0.4, "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "build",  "label": "Tension through the build", "min": 0,   "max": 1,   "step": 0.01,  "default": 0.8}
+    ]},
+    {"name": "Dragons", "params": [
+      {"id": "thick",  "label": "Body thickness",            "min": 0.4, "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "length", "label": "Body length",               "min": 1,   "max": 4.5, "step": 0.05,  "default": 2.9},
+      {"id": "legs",   "label": "Legs",                      "min": 0,   "max": 1,   "step": 1,     "default": 1},
+      {"id": "whisk",  "label": "Whiskers",                  "min": 0,   "max": 1,   "step": 1,     "default": 1},
+      {"id": "rhue",   "label": "Fire dragon hue",           "min": 0,   "max": 1,   "step": 0.005, "default": 0.995},
+      {"id": "bhue",   "label": "Ice dragon hue",            "min": 0,   "max": 1,   "step": 0.005, "default": 0.6}
+    ]},
+    {"name": "Breath", "params": [
+      {"id": "fire",   "label": "Fire and ice",              "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "reach",  "label": "Breath reach",              "min": 0.2, "max": 1.2, "step": 0.01,  "default": 0.9},
+      {"id": "clash",  "label": "Clash burst",               "min": 0,   "max": 2,   "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Kiss", "params": [
+      {"id": "every",  "label": "Kiss every (beats)",        "min": 16,  "max": 128, "step": 16,    "default": 64},
+      {"id": "hearts", "label": "Hearts and kiss glow",      "min": 0,   "max": 2,   "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Look", "params": [
+      {"id": "glow",   "label": "Glow",                      "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "stars",  "label": "Stars",                     "min": 0,   "max": 2,   "step": 0.01,  "default": 0.4},
+      {"id": "bright", "label": "Brightness",                "min": 0,   "max": 2,   "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Beat", "params": [
+      {"id": "punch",  "label": "Beat punch",                "min": 0,   "max": 1.5, "step": 0.01,  "default": 0.5},
+      {"id": "droplock", "label": "Kiss on the drop",        "min": 0,   "max": 1,   "step": 1,     "default": 1, "kind": "fixed"}
+    ]}
+  ]
+}

@@ -151,8 +151,11 @@ class Engine:
         self.flash_t = 0.0              # tap: white hit decaying over about a beat
         self.look = None                # latched scene: INTRO | GROOVE | BREAKDOWN | DROP
         self.look_t = 0.0
-        self.palette_mode = "auto"      # auto (track key) | lock | cycle
+        self.palette_mode = "auto"      # auto (track key) | lock | cycle | visuals
         self.palette_hue = 0.83
+        self.visual = None              # the projected visual's main colour: {"hue", "sat", "t"} (/api/visual_colour)
+        self.vis_hue = None             # where the lights' hue has glided to in visuals mode
+        self.vis_t = 0.0
         self.speed = 1.0                # 0.5 half-time, 1, 2 double-time
         # Mixer reactions (DJM-450 via brain/mixer): bass kill, level, kicks, and mapped MIDI controls.
         self.mixer_react = CONFIG.get("mixer", {}).get("react", True)
@@ -477,7 +480,23 @@ class Engine:
         elif self.palette_mode == "cycle":
             step = (ctx["bar"] - 1) // 4 if ctx["bar"] > 0 else int(t / 8)
             ctx["hue"] = (ctx["hue"] + 0.125 * step) % 1.0
+        elif self.palette_mode == "visuals":
+            ctx["hue"] = self.visual_hue(ctx["hue"], t)
         return ctx
+
+    def visual_hue(self, key_hue, t):
+        """The projected visual's main colour, glided to (about half a second, the short way round the
+        colour wheel) so the lights follow the picture without flicking. No reading for 5 s (the
+        projector page closed, or a dark or grey picture): glide back to the track's key colour."""
+        v = self.visual
+        target = v["hue"] if v and t - v["t"] < 5.0 else key_hue
+        dt = min(0.25, max(0.0, t - self.vis_t))
+        self.vis_t = t
+        if self.vis_hue is None:
+            self.vis_hue = target
+        d = (target - self.vis_hue + 0.5) % 1.0 - 0.5
+        self.vis_hue = (self.vis_hue + d * (1 - math.exp(-dt / 0.5))) % 1.0
+        return self.vis_hue
 
     def react(self, ctx, t):
         """Layer what the mixer is doing on top of the show: runs after shape(), before output_fx()."""
@@ -583,7 +602,7 @@ class Engine:
             self.look_t = t
         elif cmd == "palette":
             v = c.get("value") or {}
-            if v.get("mode") in ("auto", "lock", "cycle"):
+            if v.get("mode") in ("auto", "lock", "cycle", "visuals"):
                 self.palette_mode = v["mode"]
             if v.get("hue") is not None:
                 self.palette_hue = float(v["hue"]) % 1.0
@@ -871,9 +890,20 @@ def make_handler(engine):
                 self._send(200, page.read_bytes(), "text/html; charset=utf-8")
 
         def do_POST(self):
-            if s5auth.handle(self) or not s5auth.guard(self):
+            # /api/visual_colour is open (like the projector's /api/screen): the projector service posts the
+            # picture's main colour; it only steers the lights while an admin has the palette on Visuals.
+            if s5auth.handle(self) or not s5auth.guard(self, allow=("/api/visual_colour",)):
                 return
             n = int(self.headers.get("Content-Length", 0))
+            if self.path.split("?", 1)[0] == "/api/visual_colour":
+                try:
+                    d = json.loads(self.rfile.read(n) or b"{}")
+                    if d.get("hue") is not None:     # null (no colour on screen) just lets the last one go stale
+                        engine.visual = {"hue": float(d["hue"]) % 1.0, "sat": float(d.get("sat", 1.0)), "t": time.time()}
+                    self._send(200, b'{"ok": true}')
+                except Exception as e:
+                    self._send(400, json.dumps({"ok": False, "error": str(e)}).encode())
+                return
             try:
                 res = engine.command(json.loads(self.rfile.read(n) or b"{}"))
                 self._send(200, json.dumps(res).encode())
@@ -915,6 +945,8 @@ def main():
             "intensity": engine.intensity, "hold": engine.hold, "strobe": engine.strobe,
             "strobe_div": engine.strobe_div, "blinder": engine.blinder, "black_hold": engine.black_hold,
             "look": engine.look, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
+            "visual": None if not engine.visual else {"hue": round(engine.visual["hue"], 3), "sat": round(engine.visual["sat"], 2),
+                                                      "age_s": round(time.time() - engine.visual["t"], 1)},
             "speed": engine.speed, "tap_bpm": round(engine.tap_bpm, 1),
             "forced": engine.forced, "fixtures": [f.name for f in fixtures],
             "fixture_info": {f.name: {"kind": f.kind, "leds": f.cfg.get("leds") or (f.out.count if f.kind == "pyramid" else None),
