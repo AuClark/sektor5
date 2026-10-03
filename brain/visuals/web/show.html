@@ -227,10 +227,15 @@
   .dpad button svg { width: 18px; height: 18px; }
   .dpad button:active, .dpad button.held { background: var(--text); color: var(--on); }
   .dpad .mid { font-size: 10px; font-weight: 600; color: var(--dim); }
+  .zoomrow { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 4px; margin-bottom: 8px; }
+  .zoomrow button { height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text);
+                    font: 600 13px var(--font); font-variant-numeric: tabular-nums; touch-action: none; }
+  .zoomrow button svg { width: 16px; height: 16px; }
+  .zoomrow button:active, .zoomrow button.held { background: var(--text); color: var(--on); }
   .xy { position: relative; border-radius: 10px; background: var(--card); border: 1px solid var(--border); touch-action: none; cursor: grab; min-height: 128px; overflow: hidden; }
   .xy .cx, .xy .cy { position: absolute; background: var(--border2); } .xy .cx { left: 50%; top: 0; bottom: 0; width: 1px; } .xy .cy { top: 50%; left: 0; right: 0; height: 1px; }
   .xy b { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 4px var(--accent-soft); left: 50%; top: 50%; }
-  .label em.for { font-style: normal; font-weight: 600; color: var(--text); background: var(--muted); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
+  .label em.for { white-space: nowrap; font-style: normal; font-weight: 600; color: var(--text); background: var(--muted); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
   .label em.for:empty { display: none; }
   /* A surface on its own sketch is picked: what only plays the Focus look steps back, and says so */
   body.own .fo { opacity: .35; pointer-events: none; }
@@ -636,7 +641,10 @@
           </div>
           <div class="xy" id="xyPad" title="Drag to move the picture; double-tap to centre it"><i class="cx"></i><i class="cy"></i><b id="xyDot"></b></div>
         </div>
-        <div class="seg sm" id="nudgeStep" title="How far one tap moves it"><button data-v="0.005">Fine</button><button data-v="0.02">Normal</button><button data-v="0.08">Big</button></div>
+        <div class="zoomrow" title="How big the picture is inside the surface (hold to keep going)">
+          <button data-z="-1" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"/></svg></button><button id="zoomV" title="Back to 100%">100%</button><button data-z="1" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
+        </div>
+        <div class="seg sm" id="nudgeStep" title="How far one tap moves or zooms it"><button data-v="0.005">Fine</button><button data-v="0.02">Normal</button><button data-v="0.08">Big</button></div>
       </div>
       <div class="fonote" id="foNote" hidden></div>
       <div class="nonly energyblk fo">
@@ -1174,7 +1182,7 @@ function useLayout(l) {
   if (SEL && !TG()) SEL = null;                          // its surface went (deleted in the editor)
   if (NUDGE) {                                           // a nudge still settling: keep it, not the poll's older copy
     const x = mineS().find(y => y.id === NUDGE.id);
-    if (x && performance.now() < NUDGE.until) { x.off_x = NUDGE.x; x.off_y = NUDGE.y; } else NUDGE = null;
+    if (x && performance.now() < NUDGE.until) { x.off_x = NUDGE.x; x.off_y = NUDGE.y; x.zoom = NUDGE.z; } else NUDGE = null;
   }
   paintTarget();
 }
@@ -1218,7 +1226,7 @@ const pinTo = (n, preset = null) => x => Object.assign(x, n ? { content: "gen", 
 // later; while it's settling, the layout poll can't snap it back.
 let NUDGE = null, nTimer = 0, nStep = +localStorage.getItem("s5nudge") || 0.02;
 const NMAX = 0.5;
-const offOf = t => NUDGE && NUDGE.id === t.id ? NUDGE : { x: t.off_x || 0, y: t.off_y || 0 };
+const offOf = t => NUDGE && NUDGE.id === t.id ? NUDGE : { x: t.off_x || 0, y: t.off_y || 0, z: t.zoom || 1 };
 const offWords = o => { const w = (v, a, b) => Math.abs(v) < 0.0025 ? "" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? b : a}`;
   return [w(o.x, "left", "right"), w(o.y, "up", "down")].filter(Boolean).join(", ") || "centred"; };
 function paintNudge() {
@@ -1230,18 +1238,19 @@ function paintNudge() {
   $("nudgeFor").textContent = "for " + (t.name || t.id);
   $("nudgeV").textContent = offWords(o);
   $("xyDot").style.left = (50 + o.x / NMAX * 50) + "%"; $("xyDot").style.top = (50 + o.y / NMAX * 50) + "%";
+  $("zoomV").textContent = Math.round(o.z * 100) + "%";
 }
-function nudgeTo(x, y) {
+function nudgeTo(x, y, z) {
   const t = TG(); if (!t) return;
   const c = v => Math.round(Math.max(-NMAX, Math.min(NMAX, v)) * 1000) / 1000;
-  x = c(x); y = c(y);
-  NUDGE = { id: t.id, x, y, until: performance.now() + 2000 };
-  t.off_x = x; t.off_y = y;                               // the preview draws from this same layout object
+  x = c(x); y = c(y); z = Math.round(Math.max(0.5, Math.min(2.5, z ?? offOf(t).z)) * 1000) / 1000;
+  NUDGE = { id: t.id, x, y, z, until: performance.now() + 2000 };
+  t.off_x = x; t.off_y = y; t.zoom = z;                   // the preview draws from this same layout object
   paintNudge();
   clearTimeout(nTimer);
   nTimer = setTimeout(async () => {
     const n = NUDGE; if (!n) return;
-    await setSurface(n.id, x2 => { x2.off_x = n.x; x2.off_y = n.y; }, "Position");
+    await setSurface(n.id, x2 => { x2.off_x = n.x; x2.off_y = n.y; x2.zoom = n.z; }, "Position");
     if (NUDGE === n) NUDGE.until = performance.now() + 800;
   }, 160);
 }
@@ -1255,6 +1264,17 @@ $("nudge").querySelectorAll("[data-d]").forEach(b => {
   b.onpointerup = b.onpointercancel = b.onlostpointercapture = stop;
 });
 $("nudgeC").onclick = () => nudgeTo(0, 0);
+// Zoom: each tap is a step of the same size as the nudge's (Fine 0.75%, Normal 3%, Big 12%), around the surface's centre.
+const zoomBy = d => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x, o.y, o.z * Math.pow(1 + nStep * 1.5, d)); } };
+$("nudge").querySelectorAll("[data-z]").forEach(b => {
+  const d = +b.dataset.z; let rep = 0;
+  const stop = () => { clearTimeout(rep); clearInterval(rep); b.classList.remove("held"); };
+  b.onpointerdown = e => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add("held"); zoomBy(d);
+    rep = setTimeout(() => { rep = setInterval(() => zoomBy(d), 70); }, 350); };
+  b.onpointerup = b.onpointercancel = b.onlostpointercapture = stop;
+});
+$("zoomV").onclick = () => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x, o.y, 1); } };
+$("xyPad").addEventListener("wheel", e => { if (!TG()) return; e.preventDefault(); zoomBy(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
 $("nudgeStep").querySelectorAll("button").forEach(b => b.onclick = () => { nStep = +b.dataset.v; localStorage.setItem("s5nudge", nStep); paintNudge(); });
 { // the pad: drag anywhere to move the picture with your finger (relative, so a touch never jumps it); double-tap centres
   const pad = $("xyPad"); let st = null, lastTap = 0;
@@ -1265,11 +1285,13 @@ $("nudgeStep").querySelectorAll("button").forEach(b => b.onclick = () => { nStep
     nudgeTo(st.ox + (e.clientX - st.x) / st.w * 2 * NMAX * k, st.oy + (e.clientY - st.y) / st.h * 2 * NMAX * k); };
   pad.onpointerup = pad.onpointercancel = () => { st = null; };
 }
-// Arrow keys nudge too, on the Projection screen with a surface picked (Shift = Big).
+// Arrow keys nudge too, and - / = zoom, on the Projection screen with a surface picked (Shift = Big).
 addEventListener("keydown", e => {
+  const z = { "-": -1, "_": -1, "=": 1, "+": 1 }[e.key];
   const d = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
-  if (!d || !document.querySelector("#s-visuals.on") || !TG() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  if ((!d && !z) || !document.querySelector("#s-visuals.on") || !TG() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
   e.preventDefault(); e.stopImmediatePropagation();
+  if (z) return zoomBy(z * (e.shiftKey ? 0.08 / nStep : 1));
   const k = e.shiftKey ? 0.08 / nStep : 1; nudgeBy(d[0] * k, d[1] * k);
 }, true);
 

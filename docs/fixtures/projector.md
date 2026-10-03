@@ -49,7 +49,7 @@ On site, the real projector needs the same position, aim and throw as in the Sta
 
 Every surface has its own opacity and hue shift, so neighbouring surfaces can use complementary colours.
 
-**Picture position:** a surface's **Picture across** and **Picture up / down** (and **Centre picture**) shift the picture inside it without moving its corners, up to half its width or height (`off_x`, `off_y` in the layout; + is right / down). It's handy when the interesting part of a sketch doesn't land in the middle of an odd-shaped face. Focus's Projection screen has the same as a d-pad and a drag pad.
+**Picture position and zoom:** a surface's **Picture across** and **Picture up / down** shift the picture inside it without moving its corners, up to half its width or height (`off_x`, `off_y` in the layout; + is right / down). **Picture zoom** scales it about the surface's centre, 50% to 250% (`zoom`, 1 = as made). **Reset picture** puts both back. It's handy when the interesting part of a sketch doesn't land in the middle of an odd-shaped face. Focus's Projection screen has the same as a d-pad and a drag pad.
 
 **Corners and borders:** each surface also has a **corner radius** (0 = square, up to fully round) and an optional **border**: a bright band just inside the edge, with the content inside it. Border controls: width, brightness (up to 200%), colour (white through to the show's colour) and beat pulse (0 = steady, 1 = flashes on the beat).
 

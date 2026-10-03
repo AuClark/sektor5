@@ -168,7 +168,8 @@
       <label>Border beat pulse <span id="vBp"></span></label><input id="pBp" type="range" min="0" max="1" step="0.05">
       <label title="Shift the picture inside the surface without moving its corners">Picture across <span id="vOx"></span></label><input id="pOx" type="range" min="-0.5" max="0.5" step="0.005">
       <label>Picture up / down <span id="vOy"></span></label><input id="pOy" type="range" min="-0.5" max="0.5" step="0.005">
-      <div class="row" style="margin-top:6px"><button id="bFill">Fill screen</button><button id="bCentre" title="Put the picture back in the middle of the surface">Centre picture</button><button id="bReset">Reset corners</button><button id="bSel">Next corner ↻</button></div>
+      <label title="How big the picture is inside the surface (its corners stay put)">Picture zoom <span id="vZm"></span></label><input id="pZm" type="range" min="0.5" max="2.5" step="0.01">
+      <div class="row" style="margin-top:6px"><button id="bFill">Fill screen</button><button id="bCentre" title="Put the picture back in the middle of the surface, at 100%">Reset picture</button><button id="bReset">Reset corners</button><button id="bSel">Next corner ↻</button></div>
     </div>
     <div class="card">
       <h3>Masks</h3>
@@ -432,11 +433,12 @@ const SHAPE = [["pRad", "radius", 0, v => v.toFixed(3)], ["pBw", "border", 0, v 
                ["pBs", "border_sat", 0, v => v < 0.05 ? "white" : v > 0.95 ? "show colour" : Math.round(v * 100) + "% colour"],
                ["pBp", "border_pulse", 0, v => Math.round(v * 100) + "%"],
                ["pOx", "off_x", 0, v => Math.abs(v) < 0.0025 ? "centred" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? "right" : "left"}`],
-               ["pOy", "off_y", 0, v => Math.abs(v) < 0.0025 ? "centred" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? "down" : "up"}`]];
+               ["pOy", "off_y", 0, v => Math.abs(v) < 0.0025 ? "centred" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? "down" : "up"}`],
+               ["pZm", "zoom", 1, v => Math.round(v * 100) + "%"]];
 const shapeLabel = (sl, v) => { const d = SHAPE.find(x => x[0] === sl); $("v" + sl.slice(1)).textContent = d[3](v); };
 for (const [sl, key] of SHAPE)
   $(sl).oninput = e => { const s = sel(); if (s) { s[key] = +e.target.value; shapeLabel(sl, s[key]); push(); } };
-$("bCentre").onclick = () => { const s = sel(); if (s) { s.off_x = 0; s.off_y = 0; push(true); ui(); } };
+$("bCentre").onclick = () => { const s = sel(); if (s) { s.off_x = 0; s.off_y = 0; s.zoom = 1; push(true); ui(); } };
 $("pLead").oninput = e => { L.lead_ms = +e.target.value; $("vLead").textContent = L.lead_ms; push(); };
 $("pRs").onchange = e => { L.render_scale = +e.target.value; push(true); };
 $("pBr").oninput = e => { L.brightness = +e.target.value; $("vBr").textContent = Math.round(L.brightness * 100) + "%"; push(); };

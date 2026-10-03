@@ -134,6 +134,7 @@ def clean_layout(d):
             "radius": float(max(0.0, min(0.5, s.get("radius", 0.0)))),              # corner radius, surface heights
             "off_x": float(max(-1.0, min(1.0, s.get("off_x", 0.0) or 0.0))),         # the picture's position in the surface:
             "off_y": float(max(-1.0, min(1.0, s.get("off_y", 0.0) or 0.0))),         # + right / down, in surface widths / heights
+            "zoom": float(max(0.25, min(4.0, s.get("zoom", 1.0) or 1.0))),            # the picture's size in it (1 = as made)
             "border": float(max(0.0, min(0.15, s.get("border", 0.0)))),             # border band width
             "border_bright": float(max(0.0, min(2.0, s.get("border_bright", 1.0)))),
             "border_sat": float(max(0.0, min(1.0, s.get("border_sat", 0.0)))),      # 0 white .. 1 show colour

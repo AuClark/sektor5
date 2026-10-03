@@ -258,6 +258,7 @@ uniform float u_radius, u_border, u_bbright, u_bsat, u_bpulse;
 uniform float u_tri;   // 1: a triangle surface (apex at the top centre of the square)
 uniform float u_dia;   // 1: a diamond surface (the square's edge midpoints on its corners)
 uniform vec2 u_off;    // where the picture sits in its surface: + moves it right / down, in surface widths / heights
+uniform float u_zoom;  // how big the picture is in its surface, about the surface's centre: 1 = as made, 2 = twice
 uniform float u_px;   // one output pixel in surface units (surface height = 1), for anti-aliasing
 uniform sampler2D u_tex;
 // The live track's waveform, resampled per beat by the visuals service (trackwave.py).
@@ -459,7 +460,7 @@ void main() {
     if (sd > 2.0 * u_px) discard;
   }
   float a = smoothstep(0.0, 1.5 * u_px, -sd) * u_opacity;
-  vec2 cuv = (u_trole > 0.5 ? s5t_uv(uv) : uv) - u_off;   // the shape stays put; the picture inside it moves
+  vec2 cuv = ((u_trole > 0.5 ? s5t_uv(uv) : uv) - 0.5 - u_off) / max(u_zoom, 0.05) + 0.5;   // the shape stays put; the picture moves and scales in it
   vec3 c = content(cuv) * u_bright;
   if (u_trole > 0.5 && u_trole < 1.5) {        // incoming: masked, with the transition's edge light
     vec3 g = vec3(0.0);
@@ -778,7 +779,7 @@ class MapRenderer {
     const u = {};
     for (const n of ["u_res", "u_Hinv", "u_aspect", "u_beat", "u_frac", "u_bwb", "u_bar", "u_hue", "u_scene", "u_progress",
                      "u_since", "u_energy", "u_sp", "u_opacity", "u_bright", "u_sel", "u_time", "u_tex",
-                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri", "u_dia", "u_off",
+                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri", "u_dia", "u_off", "u_zoom",
                      "u_wave", "u_wv", "u_wloop", "u_text", "u_textn", "u_trole", "u_tp", "u_tmode", "u_tseed", "u_tdur", "u_todrop", "u_cbeat", ...extra])
       u[n] = gl.getUniformLocation(p, n);
     return { p, u, a: gl.getAttribLocation(p, "a") };
@@ -924,7 +925,7 @@ class MapRenderer {
     gl.uniform2f(u.u_res, W, H);
     gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners, s.shape))));
     gl.uniform1f(u.u_tri, s.corners.length === 3 ? 1 : 0);
-    gl.uniform2f(u.u_off, s.off_x || 0, s.off_y || 0);
+    gl.uniform2f(u.u_off, s.off_x || 0, s.off_y || 0); gl.uniform1f(u.u_zoom, s.zoom || 1);
     gl.uniform1f(u.u_dia, isDiamond(s) ? 1 : 0);
     const xs = s.corners.map(c => c[0]), ys = s.corners.map(c => c[1]);
     gl.uniform4f(u.u_box, 2 * Math.min(...xs) - 1, 1 - 2 * Math.max(...ys), 2 * Math.max(...xs) - 1, 1 - 2 * Math.min(...ys));
