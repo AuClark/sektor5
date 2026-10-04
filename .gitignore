@@ -13,3 +13,4 @@ brain/showbrain/s5auth.js
 brain/projector/web/s5auth.js
 brain/visuals/web/s5auth.js
 fixtures/holofan/capture/*.bin
+fixtures/holofan/capture/*.logcat.txt

@@ -77,3 +77,16 @@ The scripts in `fixtures/holofan/capture/` switch the Mac onto the fan's Wi-Fi, 
 For the recording: give Holoscope photo access (iOS Settings → Apps → Holoscope → Photos and videos → Edit selection), turn off auto-join for FT Home on the Mac so macOS doesn't pull it back mid-recording, and put the phone on the fan's Wi-Fi. Upload a solid colour first, then a single dot on black, so the packing can be read from the bytes. The first two attempts (4 Oct) only recorded the fan's side: the relay never heard the app announce, so it never connected on to it.
 
 **Over USB instead (recommended):** with `USB=1`, `relay.sh` forwards the app's port over a USB cable (`adb forward tcp:6667 tcp:6666`) and the relay connects to it there, so the phone stays on the home network and the fan can only reach the Mac. It also records the phone's logcat next to the recording. Tested 4 Oct: Holoscope (`javainterface.OpenAndroidAlbum`) listens on 6666 off the fan's network and starts querying as soon as something connects (`5A 0D 0D F5`, `5A 1C 1C F5`). Wireless ADB won't do, as it drops when the Mac moves to the fan's Wi-Fi.
+
+### What the first recorded uploads showed (4 Oct)
+
+Recorded with the USB relay (`relay-try3.bin`, not in git): one picture (`im_alive.png`, 1024 × 1024, kept in `capture/` as the test image) and one 18.5 s, 24 fps, 512 × 512 video, both shown on the fan.
+- Start: app `5A 84 0C <"04160734.mp4"> <n> F5` (the name is always MMDDhhmm `.mp4`, whatever the source); fan `5A 0E 0E F5` = file created. The byte before `F5` went 08, 09, 0A over three uploads: probably a counter.
+- Header: 4 bytes LE, `3C 00 00 00` (60) for a picture, `01 00 00 00` for a video.
+- Data: **141,120 bytes per frame = 490 rows × 288 bytes** (so model 15 takes the 288-bytes-per-row branch), no per-frame header. The video was 224 frames: the app resamples to the model's 12 fps (444 frames at 24 fps → 224).
+- Finish: `5A 91 00 00 00 <c> <c> F5` sent three times, about 0.5 s apart; `<c>` was `77` for the picture and `E3` for the video (not a plain sum or XOR of the data). No acknowledgement per chunk: the fan only sends its usual status.
+- Then the app picks the new clip with `5A 87 <n> <n> F5`.
+- The app's logcat narrates the conversion (`D/default`): source size, `radius 512 center_X 512 center_Y 512` for a 1024² image (centre = middle, radius = half the side), `led_num 122`, `line_num 490`, frame counts and fps.
+- A video taken from the app's own file list (try 2) made the fan drop the connection 1 s in; the gallery video in try 3 was fine. Not explained yet.
+
+Next: decode the 288-byte row layout against `im_alive.png`, then build the same 141,120 bytes from the image and upload it with our own controller.
