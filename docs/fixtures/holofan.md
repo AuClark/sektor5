@@ -66,3 +66,12 @@ A picture, in order (`hs42lpicprocess`):
 4. Sent in 11,680-byte chunks (`sendTo`), each frame with a 4-byte length header (`sendgroupdata`); then `transfinish` once every chunk is acknowledged.
 
 Still to do: confirm model 15's packing branch and port it exactly; find where the three tables are filled; the `transfinish` packet and the fan's acknowledgements; then upload a test picture. Recording one real upload (the fan connects to the controller, which connects on to the app) would let each step be checked against the app's own output.
+
+### Recording an upload
+
+The scripts in `fixtures/holofan/capture/` switch the Mac onto the fan's Wi-Fi, do one thing, and switch back to the home network (`<home ssid> <home password>` as arguments; logs go to `~/fan-*.txt`). `PY` picks the Python (default `python3`).
+- `relay.sh`: after 45 s, joins the fan's Wi-Fi and runs `relay.py`, which announces itself so the fan connects to the Mac, then connects on to the app (once the app announces) and records both directions to `capture/relay.bin` (or `$OUT`). It stops 45 s after a large transfer goes quiet, or after 6 minutes.
+- `dump.py <recording>`: one line per read; `--join` writes each direction out as one file for comparing with the source image.
+- `fan_info.sh`, `fan_play.sh <clip>`, `fan_join.sh`: save the fan's status, play a clip by name, and try joining it to the home network.
+
+For the recording: give Holoscope photo access (iOS Settings → Apps → Holoscope → Photos and videos → Edit selection), turn off auto-join for FT Home on the Mac so macOS doesn't pull it back mid-recording, and put the phone on the fan's Wi-Fi. Upload a solid colour first, then a single dot on black, so the packing can be read from the bytes. The 4 Oct attempt only recorded the fan's side: the app never connected.
