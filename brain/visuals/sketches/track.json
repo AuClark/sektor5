@@ -1,13 +1,14 @@
 {
   "title": "Track",
-  "about": "The waveform of the song that's actually playing, from the decks: 0 terrain (Unknown Pleasures made of the song, upcoming bars rolling in), 1 scrolling colour waveform, 2 ring, 3 bass/mids/highs meters. Plays a demo track when no deck is live.",
+  "about": "The waveform of the song that's actually playing, from the decks: 0 terrain (Unknown Pleasures made of the song, upcoming bars rolling in), 1 what the DJ sees on the decks (the full-detail colour waveform scrolling past a playhead, beat and bar ticks, bar numbers), 2 ring, 3 bass/mids/highs meters. Plays a demo track when no deck is live.",
   "groups": [
     {"name": "View", "params": [
-      {"id": "mode",   "label": "Mode (0 terrain, 1 scroll, 2 ring, 3 meters)", "min": 0, "max": 3, "step": 1, "default": 0},
+      {"id": "mode",   "label": "Mode (0 terrain, 1 deck view, 2 ring, 3 meters)", "min": 0, "max": 3, "step": 1, "default": 1},
       {"id": "lines",  "label": "Terrain: bars shown",   "min": 4,     "max": 64,   "step": 1,     "default": 24},
-      {"id": "window", "label": "Scroll / ring: beats shown", "min": 4, "max": 128, "step": 4,    "default": 32},
-      {"id": "play",   "label": "Scroll: playhead position", "min": 0, "max": 1,    "step": 0.01,  "default": 0.35},
-      {"id": "past",   "label": "Brightness of what's played / to come", "min": 0, "max": 1, "step": 0.01, "default": 0.35}
+      {"id": "window", "label": "Ring: beats shown",     "min": 4,     "max": 128,  "step": 4,     "default": 32},
+      {"id": "dwin",   "label": "Deck view: beats shown", "min": 2,    "max": 64,   "step": 1,     "default": 8},
+      {"id": "play",   "label": "Deck view: playhead position", "min": 0, "max": 1, "step": 0.01,  "default": 0.33},
+      {"id": "past",   "label": "Brightness of what's played / to come", "min": 0, "max": 1, "step": 0.01, "default": 0.55}
     ]},
     {"name": "Waveform", "params": [
       {"id": "amp",    "label": "Height",                "min": 0.02,  "max": 0.5,  "step": 0.005, "default": 0.14},
@@ -18,7 +19,8 @@
     ]},
     {"name": "Colour", "params": [
       {"id": "colour", "label": "Colour (0 the track's own, 1 tint)", "min": 0, "max": 1, "step": 1, "default": 0},
-      {"id": "hue",    "label": "Tint hue",              "min": 0,     "max": 1,    "step": 0.005, "default": 0.11},
+      {"id": "exact",  "label": "rekordbox colours exactly (yellow included)", "min": 0, "max": 1, "step": 1, "default": 0, "kind": "fixed"},
+      {"id": "hue",    "label": "Tint hue",              "min": 0,     "max": 1,    "step": 0.005, "default": 0.9},
       {"id": "sat",    "label": "Tint saturation",       "min": 0,     "max": 1,    "step": 0.01,  "default": 0.8},
       {"id": "follow", "label": "Follow show hue",       "min": 0,     "max": 1,    "step": 1,     "default": 0}
     ]}

@@ -107,6 +107,18 @@ Low sides with no roundness, zero wave frequency and some twist gives the stacke
 
 `emergence` is not a real reaction-diffusion simulation (that needs a feedback buffer the renderer doesn't have yet). It adds up plane waves of one wavelength in scattered directions and colours where the sum is above a level, which gives the same labyrinth with no memory between frames, so every surface stays in sync.
 
+### Synthwave, Aurora and Elevated
+
+Three sketches that draw the song itself, at full detail (every frame of rekordbox's waveform, about 70 samples a beat):
+
+| Sketch | What it is | How it follows the music |
+|---|---|---|
+| `synthwave` | The outrun sunset: a striped sun over a neon grid | The floor is the track's waveform as glowing ridges in perspective, one beat a row with every sample across it, rolling in on the beat (the row under your feet is what you hear, the beats to come are at the horizon), coloured by bass, mids and highs. The skyline is the whole track, start to end, the played part lit with a playhead. The sun swells on the kick. |
+| `aurora` | Northern lights over a mountain lake: folding curtains, rays, pines, the lake mirroring it | The synths swell the curtains and set them moving, the highs shimmer the rays, the kick sends a pulse of light along each curtain, and the build into a drop brightens them into a pink-topped burst. |
+| `elevated` | A flight low over eroded mountains at dusk, after RGBA's 2009 4k demo (the technique, not its code) | The land along the flight is as tall as the waveform is loud at the beat you'll fly over it, so loud sections are ranges of peaks you fly into as they play and breakdowns are valley floors. The camera climbs into a drop and banks with the synths; the sun flares on the kick. |
+
+`elevated` raymarches the land, so it's the heaviest of the three: lower **Steps** and **View distance** (Quality) if the projector's frame rate drops. `synthwave`'s **Beats ahead** is its quality knob. All three keep to their own palettes and skip yellow, even with **Follow the show's colour** on.
+
 ### Parameters that can empty the picture
 
 The rule is that nothing may ever blank the screen, and the ranges are always clamped to each
@@ -248,9 +260,9 @@ Simplified takes on five Max Cooper videos, each a sketch with presets:
 
 Sketches can draw the song that's playing. rekordbox analyses every track when the USB is prepared, the decks share that colour waveform over Pro DJ Link, and deckdash already fetches it with the beat grid (`/api/wavedetail/N`, `/api/timeline/N`). Nothing has to be uploaded per song; it works for any track loaded from rekordbox media.
 
-- `trackwave.py` in the visuals service follows showbrain's live deck. When its track changes (deckdash's `waveformKey`), it fetches the waveform and beat grid and resamples the waveform onto the grid, 8 samples per beat, keeping the loudest frame in each slice. It pushes the result to every page once per track as a `wave` event: RGBA bytes (height, bass, mids, highs) in a 256-wide texture.
+- `trackwave.py` in the visuals service follows showbrain's live deck. When its track changes (deckdash's `waveformKey`), it fetches the waveform and beat grid and resamples the waveform onto the grid at full detail, one sample per rekordbox frame at the track's tempo (about 70 a beat at 128 BPM), keeping the loudest frame in each slice. It pushes the result to every page once per track as a `wave` event: RGBA bytes (height, bass, mids, highs) in a 256-wide texture.
 - `render.js` uploads it as a texture and gives every sketch `vec4 wave(float beat)`: height, bass, mids and highs (0..1) at any beat of the track, where 1 is the first beat. Sketches look it up with `u_beat`, so it stays on the beat through tempo changes and can read ahead (`wave(u_beat + 16.0)` is four bars from now). Outside the track it returns 0.
-- The `track` sketch uses it (terrain, scroll, ring, meters).
+- The `track` sketch uses it: by default the **deck view**, what the DJ sees on the decks (the colour waveform at full detail scrolling through a fixed playhead, played part dimmed, beat and bar ticks, bar numbers), or terrain, ring and meters.
 - **At home** (no decks) it plays a demo track, looped. To test with a real track, capture one on the rig with a track loaded: `python3 brain/visuals/tools/capture_wave.py http://<brain IP>:8080`. That saves `brain/visuals/state/wave-sample.*` (not in git), which is then used, looped, whenever no deck is live.
 - `GET /api/wave` returns the current waveform message (`source`: `live`, `sample` or `demo`; `title`, `beats`, `spb`, `w`, `h`, `data`).
 ## The words you type

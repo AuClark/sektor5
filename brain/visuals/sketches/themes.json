@@ -4,7 +4,7 @@
     {"id": "sacred",  "name": "Sacred",  "blurb": "Gold, geometry and temples",
      "sketches": ["sacred", "geometry", "throne", "gilt", "phyllotaxis", "eye", "illuminati", "ascend", "cathedral"]},
     {"id": "cosmic",  "name": "Cosmic",  "blurb": "Space, light and falling through it",
-     "sketches": ["horizon", "eclipse", "wormhole", "vertigo", "diamond", "orb"]},
+     "sketches": ["horizon", "eclipse", "wormhole", "vertigo", "diamond", "orb", "aurora", "elevated"]},
     {"id": "tales",   "name": "Tales",   "blurb": "Characters and stories",
      "sketches": ["inkwell", "sisyphus", "hypnotoad", "mouths", "labyrinth", "milking", "atlantis", "dragons"]},
     {"id": "signals", "name": "Signals", "blurb": "Secrets, surveillance and the unexplained",
@@ -14,6 +14,6 @@
     {"id": "luxe",    "name": "Luxe",    "blurb": "Shimmer, sheen and heat",
      "sketches": ["artpop", "silk", "sequin", "tropical", "umbrella", "burn"]},
     {"id": "lines",   "name": "Lines",   "blurb": "Waves, rhythm and the track itself",
-     "sketches": ["rings", "wavelength", "pendulum", "pipes", "track"]}
+     "sketches": ["rings", "wavelength", "pendulum", "pipes", "track", "synthwave"]}
   ]
 }

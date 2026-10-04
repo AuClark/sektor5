@@ -25,7 +25,7 @@ No new service, no FFT, no extra plumbing. Every sketch already gets these (see 
 
 | Source | What it is |
 |---|---|
-| `wave(beat)` | `(height, bass, mids, highs)`, each 0..1, at any beat of the **live track**, from the rekordbox colour waveform. 8 samples per beat. |
+| `wave(beat)` | `(height, bass, mids, highs)`, each 0..1, at any beat of the **live track**, from the rekordbox colour waveform, at full detail: one sample per rekordbox frame (about 70 a beat at 128 BPM). |
 | `u_beat` | the track's beat position, smooth and fractional |
 | `u_bwb` | beat within the bar, 1..4 — gives us the downbeat |
 | `u_frac`, `kick()` | position within the beat; `kick()` is 1 on the beat, decaying |
