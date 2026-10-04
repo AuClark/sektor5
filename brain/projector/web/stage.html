@@ -193,7 +193,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { LOOKS, laserFrame, strHash } from "./lasershow.js";
+import { LOOKS, laserFrame, strHash, pyramidLaserOn } from "./lasershow.js";
 
 const $ = s => document.querySelector(s);
 const PROJ = window.PROJ;
@@ -430,8 +430,14 @@ function showFrame(now) {
              strobe: !!(s && s.strobe), blinder: !!(s && s.blinder), black: !!(s && (s.black_hold || s.mode === "blackout")), intensity: s ? s.intensity ?? 0.8 : 0.8 };
   }
   const dt = (now - showAt) / 1000 * s.bpm / 60, beat = (s.beat || 0) + dt;
+  const since = s.scene === "DROP" ? (s.since_drop || 0) + dt : 0;
+  // For the laser director: which drop this is (later drops get bigger, the last is a finale) and
+  // the beat the build is heading for (each build gets its own program).
+  const drops = (s.drops || []).map(d => d.bar).sort((a, b) => a - b), dropBar = Math.floor((beat - since - 1) / 4) + 1;
+  const ordinal = Math.max(0, drops.filter(b => b <= dropBar).length - 1);
   return { scene: s.scene, beat, frac: ((beat % 1) + 1) % 1, bwb: 1 + ((Math.floor(beat) - 1) % 4 + 4) % 4, hue: s.hue || 0,
-           progress: s.progress || 0, since: s.scene === "DROP" ? (s.since_drop || 0) + dt : 0,
+           progress: s.progress || 0, since, energy: s.energy, ordinal, finale: drops.length > 1 && ordinal === drops.length - 1,
+           dropAt: s.beats_to_drop != null ? (s.beat || 0) + s.beats_to_drop : NaN,
            strobe: !!s.strobe, strobeDiv: s.strobe_div ?? 2, blinder: !!s.blinder, black: !!(s.black_hold || s.mode === "blackout"),
            intensity: s.intensity ?? 0.8 };
 }
@@ -813,10 +819,7 @@ function pyramidLook(f, k, x, side, out) {
   out.copy(hsl(f.hue + x * 0.06)).multiplyScalar((0.12 + 0.5 * kick) * (1 - 0.6 * x));
   return out.lerp(pyrW, tail * 0.85).multiplyScalar(I);
 }
-function pyramidLaser(f) {                                         // on with the drop: held a bar, on the kick, then on the one
-  if (f.black || f.scene !== "DROP") return false;
-  return f.since < 4 ? true : f.since < 32 ? f.frac < 0.5 : f.bwb === 1 && f.frac < 0.5;
-}
+function pyramidLaser(f) { return pyramidLaserOn(f, trackSeed); }   // on with the drop: held a bar, then a new rhythm each phrase
 function updatePyramid(fx, p, f, live, fast) {
   const P = p.pyr, n = P.n, side = fx.pos[0] < 0 ? -1 : 1, h = THREE.DataUtils.toHalfFloat;
   let sr = 0, sg = 0, sb = 0;
