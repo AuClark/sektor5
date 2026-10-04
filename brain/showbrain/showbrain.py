@@ -158,6 +158,7 @@ class Engine:
         self.vis_t = 0.0
         self.speed = 1.0                # 0.5 half-time, 1, 2 double-time
         self.play = None                # latched interplay (looks.PLAYS), else picked by the track
+        self.music = None               # the mixer's melody analysis (react()), for the laser show
         # Mixer reactions (DJM-450 via brain/mixer): bass kill, level, kicks, and mapped MIDI controls.
         self.mixer_react = CONFIG.get("mixer", {}).get("react", True)
         self.bass_was_out = False
@@ -506,6 +507,13 @@ class Engine:
         audio = (m or {}).get("audio")
         self.mix = {"react": self.mixer_react, "connected": bool(m), "bass_out": False,
                     "fx": self.fx_active, "filter": 0.0, "level": None}
+        # What the melody and synths are doing (mixer.py's Melody), for the laser show: passed on
+        # in the state, with the last synth onset as an age so the pages needn't share our clock.
+        mel = (audio or {}).get("melody")
+        self.music = None if not mel else {
+            "note": mel.get("note"), "conf": mel.get("conf", 0.0), "bright": mel.get("bright", 0.0), "chroma": mel.get("chroma"),
+            "onset_age": round(max(0.0, t - mel["onset_ms"] / 1000), 3) if mel.get("onset_ms") else None,
+            "level": audio.get("level")}
         if not m:
             return ctx
         self._midi(m)
@@ -963,7 +971,7 @@ def main():
             "frames": list(engine.frames),
             "fps": round(fps_meas, 1),
             "live_reason": engine.live_reason,
-            "mix": engine.mix,
+            "mix": engine.mix, "music": engine.music,
             "mixer_share": {str(k): round(v, 3) for k, v in engine.share_smooth.items()},
             "dmx": {k: d.status for k, d in UDMX_DEVICES.items()}}
         if ctx["scene"] != last_scene:

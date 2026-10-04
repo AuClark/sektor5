@@ -297,6 +297,78 @@ def loader(d):
 AUTO = AutoDJ()
 
 
+# ---------------------------------------------------------------- melody (what mixer.py's Melody hears)
+MINOR, MAJOR = (0, 2, 3, 5, 7, 8, 10), (0, 2, 4, 5, 7, 9, 11)
+_MOTIFS = {}
+
+
+def _motif(t):
+    """Each track's lead line: two 2-bar motifs of 8th notes (scale degrees, None = rest)."""
+    if t["id"] not in _MOTIFS:
+        rnd = random.Random(t["id"] * 31 + 7)
+        def line(rest):
+            d, out = rnd.choice((0, 2, 4)), []
+            for _ in range(16):
+                d = max(-3, min(9, d + rnd.choice((-2, -1, -1, 0, 1, 1, 2, 3, -3))))
+                out.append(None if rnd.random() < rest else d)
+            return out
+        _MOTIFS[t["id"]] = (line(0.25), line(0.45))
+    return _MOTIFS[t["id"]]
+
+
+def melody_at(d, now):
+    """(note as MIDI or None, wall time the current note started, section) for deck d now."""
+    t = d.track
+    key = t.get("key") or "8A"
+    try:
+        n, mode = int(key[:-1]), key[-1].upper()
+    except ValueError:
+        n, mode = 8, "A"
+    root = ((9 if mode == "A" else 0) + 7 * (n - 8)) % 12
+    scale = MINOR if mode == "A" else MAJOR
+    beat = (d.pos(now) - t.get("offset_ms", 0)) / t["beat_ms"]          # 0 = the first beat
+    bar = min(t["bars"], int(beat // 4) + 1)
+    typ, s0, s1 = section_at(t, bar)
+    a, b = _motif(t)
+    u = 2.0                                                              # notes per beat: 8ths
+    if typ == "breakdown":                                               # long notes: half a bar each
+        u = 0.5
+    elif typ == "build":                                                 # a rising arpeggio, faster towards the drop
+        u = 2.0 if (bar - s0) / max(1, s1 - s0 + 1) < 0.5 else 4.0
+    step = int(beat * u)
+    if typ == "breakdown":
+        deg = b[step % 16]
+    elif typ == "build":
+        deg = (step % 8) + (0 if u == 2 else 4)
+    elif typ in ("intro", "outro"):
+        deg = a[step % 16] if (step // 16) % 2 else None
+    else:
+        shift = (0, 2, -1, 3)[(bar // 8) % 4] if typ == "groove" else (0, 4)[(bar // 4) % 2]
+        deg = a[step % 16]
+        deg = None if deg is None else deg + shift
+    if deg is None:
+        return None, None, typ
+    octave, idx = divmod(deg, 7)
+    note = 60 + root + scale[idx] + 12 * octave + (12 if typ == "drop" else 0)
+    started = now - ((beat * u) % 1) / u * t["beat_ms"] / 1000 / d.rate()
+    return note, started, typ
+
+
+def melody_msg(now, decks):
+    """The "melody" part of the sim's mixer analysis, from the loudest playing deck."""
+    best = max((d for d in decks if d.track and d.playing and d.fader > 0.05), key=lambda d: d.fader, default=None)
+    if not best:
+        return {"chroma": [0.0] * 12, "note": None, "conf": 0.0, "bright": 0.0, "onset_ms": 0}
+    note, started, typ = melody_at(best, now)
+    chroma = [0.0] * 12
+    if note is not None:
+        for off, w in ((0, 1.0), (7, 0.45), (3 if (best.track.get("key") or "A")[-1].upper() == "A" else 4, 0.35)):
+            chroma[(note + off) % 12] = max(chroma[(note + off) % 12], w)
+    bright = {"breakdown": 0.3, "build": 0.55, "drop": 0.8, "intro": 0.4, "outro": 0.4}.get(typ, 0.6)
+    return {"chroma": chroma, "note": note, "conf": 0.8 if note is not None else 0.0, "bright": bright,
+            "onset_ms": int(started * 1000) if started else 0}
+
+
 # ---------------------------------------------------------------- mixer model
 def mixer_msg(now):
     chans, energies, kicks = {}, [], []
@@ -321,7 +393,7 @@ def mixer_msg(now):
     share = [e / total for e in energies] if total > 0.002 else [0.0, 0.0]
     audio = {"low_db": round(mrms - (25 if bass_out else 4), 1), "mid_db": round(mrms - 8, 1), "high_db": round(mrms - 14, 1),
              "kick_ms": int(max(kicks) * 1000) if kicks else 0, "bass_out": bass_out and total > 0.002,
-             "level": round(min(1.0, max(0.0, (mrms + 40) / 30)), 3)}
+             "level": round(min(1.0, max(0.0, (mrms + 40) / 30)), 3), "melody": melody_msg(now, DECKS.values())}
     return {"t": "mixer", "ts": int(now * 1000), "connected": True, "model": "DJM-450 (sim)", "channels": chans,
             "share": {"ch1": round(share[0], 3), "ch2": round(share[1], 3)}, "midi": {"count": 0, "recent": []},
             "audio": audio, "rec": {"on": False, "file": None, "secs": 0, "tracks": 0, "enabled": False, "error": None}}
