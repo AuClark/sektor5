@@ -1,0 +1,32 @@
+{
+  "title": "Aurora",
+  "about": "The northern lights over a mountain lake: layered curtains that fold and drift, bright along their lower hem and fading up through green into violet and pink, streaked with rays, mirrored in the rippling lake under pines and mountains. The synths swell the curtains and set them moving, the highs make the rays shimmer, the kick sends a pulse of light along each curtain, and the build into a drop brightens them into a pink-topped burst.",
+  "groups": [
+    {"name": "Curtains", "params": [
+      {"id": "curtains", "label": "Curtains",                "min": 1,   "max": 5,   "step": 1,     "default": 4, "kind": "quality"},
+      {"id": "height",   "label": "Height",                  "min": 0.3, "max": 2,   "step": 0.01,  "default": 1, "energy": 1},
+      {"id": "fold",     "label": "Folds",                   "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "drift",    "label": "Drift",                   "min": 0,   "max": 3,   "step": 0.01,  "default": 1, "play": false},
+      {"id": "rays",     "label": "Rays",                    "min": 0,   "max": 1,   "step": 0.01,  "default": 0.7},
+      {"id": "glow",     "label": "Glow",                    "min": 0.3, "max": 2.5, "step": 0.01,  "default": 1, "energy": 1}
+    ]},
+    {"name": "Scene", "params": [
+      {"id": "lake",     "label": "Lake reflection",         "min": 0,   "max": 1.5, "step": 0.01,  "default": 1},
+      {"id": "ripple",   "label": "Ripples",                 "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "trees",    "label": "Pines",                   "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "stars",    "label": "Stars",                   "min": 0,   "max": 2,   "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Beat", "params": [
+      {"id": "react",    "label": "Synths swell the curtains", "min": 0, "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "shimmer",  "label": "Highs shimmer the rays",  "min": 0,   "max": 2,   "step": 0.01,  "default": 1, "energy": 1},
+      {"id": "punch",    "label": "Kick pulse",              "min": 0,   "max": 2,   "step": 0.01,  "default": 0.6, "energy": 1}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "green",    "label": "Hem colour",              "min": 0.36, "max": 0.55, "step": 0.005, "default": 0.4, "kind": "fixed"},
+      {"id": "top",      "label": "Top colour",              "min": 0.7,  "max": 0.98, "step": 0.005, "default": 0.82, "kind": "fixed"},
+      {"id": "hue",      "label": "Hue shift",               "min": -0.08, "max": 0.08, "step": 0.005, "default": 0},
+      {"id": "follow",   "label": "Follow the show's colour", "min": 0,   "max": 1,   "step": 1,     "default": 0, "kind": "fixed"},
+      {"id": "bright",   "label": "Brightness",              "min": 0.3, "max": 2,   "step": 0.01,  "default": 1}
+    ]}
+  ]
+}

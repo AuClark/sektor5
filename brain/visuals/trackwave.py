@@ -4,7 +4,8 @@ rekordbox analyses every track when the USB is prepared; the decks share that co
 waveform over Pro DJ Link and deckdash already fetches it (/api/wavedetail/N, 150 frames a
 second: height 0-31 and r, g, b for bass, mids, highs) along with the beat grid
 (/api/timeline/N, beatMs). We follow showbrain's live deck, and when its track changes we
-resample the waveform onto the beat grid: SPB samples per beat, so a sketch can look it up by
+resample the waveform onto the beat grid at its full detail: native_spb() samples per beat, one
+per rekordbox frame at the track's tempo (about 70 at 128 BPM), so a sketch can look it up by
 u_beat and it stays locked to the music however the DJ changes the tempo.
 
 The result is packed as RGBA bytes (height, bass, mids, highs) in a TEX_W-wide texture and
@@ -20,33 +21,42 @@ import threading
 import time
 import urllib.request
 
-SPB = 8                    # samples per beat
+SPB = 32                   # samples per beat for the demo track; a real track gets native_spb()
+RB_FPS = 150               # rekordbox's detail waveform: frames a second
 TEX_W = 256                # texture width; height grows with the track
 POLL_S = 2.0
 
 
-def pack(samples, meta):
-    """samples: list of (height, r, g, b) 0-255. Returns the message the pages get."""
+def native_spb(beat_ms):
+    """Samples per beat that keep every frame of rekordbox's waveform at this track's tempo
+    (150 frames a second: about 70 a beat at 128 BPM, 64 at 140, 75 at 120), so nothing is lost."""
+    gaps = sorted(b - a for a, b in zip(beat_ms, beat_ms[1:]) if b > a)
+    beat = gaps[len(gaps) // 2] if gaps else 500
+    return max(8, min(128, math.ceil(beat / 1000 * RB_FPS)))
+
+
+def pack(samples, meta, spb=SPB):
+    """samples: list of (height, r, g, b) 0-255, spb a beat. Returns the message the pages get."""
     n = len(samples)
     h = max(1, math.ceil(n / TEX_W))
     buf = bytearray(TEX_W * h * 4)
     for i, s in enumerate(samples):
         buf[i * 4:i * 4 + 4] = bytes(s)
-    return {**meta, "beats": n // SPB, "spb": SPB, "w": TEX_W, "h": h,
+    return {**meta, "beats": n // spb, "spb": spb, "w": TEX_W, "h": h,
             "data": base64.b64encode(bytes(buf)).decode("ascii")}
 
 
-def resample(detail, beat_ms):
-    """Detail waveform bytes + beat times (ms) -> SPB samples per beat (loudest frame in each slice)."""
+def resample(detail, beat_ms, spb=SPB):
+    """Detail waveform bytes + beat times (ms) -> spb samples per beat (loudest frame in each slice)."""
     frames = len(detail) // 4
     out = []
     nb = len(beat_ms)
     for b in range(nb):
         t0 = beat_ms[b]
         t1 = beat_ms[b + 1] if b + 1 < nb else t0 + (t0 - beat_ms[b - 1] if b else 500)
-        for j in range(SPB):
-            f0 = int((t0 + (t1 - t0) * j / SPB) * 0.15)
-            f1 = max(f0 + 1, int((t0 + (t1 - t0) * (j + 1) / SPB) * 0.15))
+        for j in range(spb):
+            f0 = int((t0 + (t1 - t0) * j / spb) * 0.15)
+            f1 = max(f0 + 1, int((t0 + (t1 - t0) * (j + 1) / spb) * 0.15))
             best = (0, 0, 0, 0)
             for f in range(max(0, f0), min(frames, f1)):
                 hgt = detail[f * 4]
@@ -91,8 +101,9 @@ def load_sample(state_dir):
     try:
         detail = (state_dir / "wave-sample.bin").read_bytes()
         meta = json.loads((state_dir / "wave-sample.json").read_text())
-        return pack(resample(detail, meta["beatMs"]),
-                    {"key": "sample", "source": "sample", "title": meta.get("title") or "Captured track", "loop": True})
+        spb = native_spb(meta["beatMs"])
+        return pack(resample(detail, meta["beatMs"], spb),
+                    {"key": "sample", "source": "sample", "title": meta.get("title") or "Captured track", "loop": True}, spb)
     except (OSError, ValueError, KeyError):
         return None
 
@@ -137,8 +148,9 @@ class Follower:
                         detail = get(f"{self.deckdash}/api/wavedetail/{live}", timeout=5.0)
                         tl = json.loads(get(f"{self.deckdash}/api/timeline/{live}", timeout=5.0))
                         title = (p.get("track") or {}).get("title") or tl.get("title")
-                        self._set(pack(resample(detail, tl["beatMs"]),
-                                       {"key": key, "source": "live", "title": title, "player": live, "loop": False}))
+                        spb = native_spb(tl["beatMs"])
+                        self._set(pack(resample(detail, tl["beatMs"], spb),
+                                       {"key": key, "source": "live", "title": title, "player": live, "loop": False}, spb))
                     return
             except (OSError, ValueError, KeyError):
                 pass
