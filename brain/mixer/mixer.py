@@ -10,7 +10,8 @@ also play silence to it. The decks' channels are on LINE, so that silence isn't 
 
 Every 50 ms it sends a JSON "mixer" message over UDP to deckdash (:9101) and showbrain
 (:9100) with RMS/peak dB per channel, each channel's share of the mix, recent MIDI, an
-analysis of the master mix ("audio": bass/mid/high energy, kicks, bass out) and the set
+analysis of the master mix ("audio": bass/mid/high energy, kicks, bass out, and "melody": chroma,
+the lead note, brightness and synth onsets, for the laser show) and the set
 recorder's state ("rec").
 
 The recorder writes the master mix (Rec Out) to S5_REC_DIR (default /srv/rave/recordings)
@@ -23,6 +24,7 @@ S5_REC=off turns it off (the old RAVE_REC names still work).
 """
 import collections
 import json
+import math
 import os
 import shutil
 import socket
@@ -125,6 +127,67 @@ class Stereo:
         return out
 
 
+class Melody:
+    """What the synths and the melody are doing, from the master mix, for the laser show:
+    chroma (how much of each of the 12 notes is sounding), the lead note (the strongest clear
+    peak from 250 Hz to 2.5 kHz, as a MIDI number, when it stands out), brightness (spectral
+    centroid, 0 dull .. 1 bright) and synth onsets (a jump in mid/high spectral flux). Uses the
+    last ~170 ms of audio (8192 samples) for enough pitch resolution, updated every block."""
+
+    N = 8192
+
+    def __init__(self):
+        self.buf = np.zeros(self.N, np.float32)
+        self.win = np.hanning(self.N).astype(np.float32)
+        f = np.fft.rfftfreq(self.N, 1 / RATE)
+        self.f = f
+        band = (f >= 110) & (f < 3520)
+        self.chroma_idx = np.where(band)[0]
+        self.chroma_pc = (np.round(12 * np.log2(f[band] / 440.0) + 69).astype(int)) % 12
+        self.lead = np.where((f >= 250) & (f < 2500))[0]
+        self.cent = (f >= 150) & (f < 8000)
+        self.flux_band = (f >= 400) & (f < 8000)
+        self.prev = None
+        self.flux_avg = 0.0
+        self.onset_ms = 0
+        self.note = None
+
+    def update(self, mono, active, now_ms):
+        k = len(mono)
+        self.buf = np.roll(self.buf, -k)
+        self.buf[-k:] = mono[-self.N:]
+        if not active:
+            self.prev, self.note = None, None
+            return {"chroma": [0.0] * 12, "note": None, "conf": 0.0, "bright": 0.0, "onset_ms": int(self.onset_ms)}
+        mag = np.abs(np.fft.rfft(self.buf * self.win))
+        pw = mag ** 2
+        chroma = np.bincount(self.chroma_pc, weights=pw[self.chroma_idx], minlength=12)
+        chroma = chroma / (chroma.max() + 1e-12)
+        # The lead: the strongest peak in the melody band, refined between bins, if it stands out.
+        seg = mag[self.lead]
+        i = int(np.argmax(seg))
+        conf = float(seg[i] / (np.median(seg) + 1e-9))
+        j = self.lead[i]
+        if 0 < j < len(mag) - 1:
+            a, b, c = np.log(mag[j - 1:j + 2] + 1e-12)
+            j = j + 0.5 * (a - c) / (a - 2 * b + c + 1e-12)
+        freq = j * RATE / self.N
+        midi = 69 + 12 * math.log2(max(freq, 1.0) / 440.0)
+        self.note = round(midi) if conf > 8 else None
+        bright = float((self.f[self.cent] * pw[self.cent]).sum() / (pw[self.cent].sum() + 1e-12))
+        bright = min(1.0, max(0.0, math.log2(max(bright, 150) / 150) / math.log2(8000 / 150)))
+        # Synth onset: the rise in the mid/high spectrum against its recent average.
+        lm = np.log1p(mag[self.flux_band])
+        if self.prev is not None:
+            flux = float(np.maximum(lm - self.prev, 0).mean())
+            if flux > 1.8 * self.flux_avg + 1e-3 and now_ms - self.onset_ms > 90:
+                self.onset_ms = now_ms
+            self.flux_avg += 0.08 * (flux - self.flux_avg)
+        self.prev = lm
+        return {"chroma": [round(float(v), 2) for v in chroma], "note": self.note, "conf": round(min(conf / 30, 1.0), 2),
+                "bright": round(bright, 3), "onset_ms": int(self.onset_ms)}
+
+
 class Analyser:
     """Bass / mid / high energy, kicks and "bass out" from the master mix, one 50 ms block at a time.
 
@@ -147,6 +210,7 @@ class Analyser:
         self.bass_out = False
         self.cand_since = None
         self.low_hist = collections.deque(maxlen=12)    # ~0.6 s: a beat, so gaps between kicks don't count
+        self.melody = Melody()
 
     def update(self, mono, master_db, now_ms):
         spec = np.abs(np.fft.rfft(mono * self.win)) ** 2 / len(mono)
@@ -185,7 +249,8 @@ class Analyser:
             self.bass_out, self.cand_since = False, None
         return {"low_db": round(sm["low"], 1), "mid_db": round(sm["mid"], 1), "high_db": round(sm["high"], 1),
                 "kick_ms": int(self.last_kick), "bass_out": bool(self.bass_out),
-                "level": round(min(1.0, max(0.0, (master_db + 40) / 30)), 3)}
+                "level": round(min(1.0, max(0.0, (master_db + 40) / 30)), 3),
+                "melody": self.melody.update(mono, active, now_ms)}
 
 
 # ---------------------------------------------------------------- set recorder

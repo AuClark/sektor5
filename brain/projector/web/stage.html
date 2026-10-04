@@ -119,6 +119,7 @@
         <option value="">Follow show</option><option value="GROOVE">Groove</option><option value="BUILD">Build</option><option value="PREDROP">Predrop</option><option value="DROP">Drop</option><option value="BREAKDOWN">Breakdown</option><option value="INTRO">Intro</option></select></div>
       <div class="row"><span>Daylight</span><input id="day" type="range" min="0" max="1" step="0.05" value="0" title="Night to dusk to day (saved with the layout)"></div>
       <div class="row"><span>Glow</span><div><button id="bloom" class="on" title="Glow (turn off on slow machines)">Glow</button></div></div>
+      <div class="row"><span>Lasers</span><div><button id="aboveHeads" class="on" title="Keep every beam above the crowd's heads (3 m over the audience floor), as a real show must unless it's been assessed for audience scanning. Saved with the layout.">Above heads</button></div></div>
     </section>
     <section>
       <h2>Rig</h2>
@@ -438,7 +439,9 @@ function showFrame(now) {
   return { scene: s.scene, beat, frac: ((beat % 1) + 1) % 1, bwb: 1 + ((Math.floor(beat) - 1) % 4 + 4) % 4, hue: s.hue || 0,
            progress: s.progress || 0, since, energy: s.energy, ordinal, finale: drops.length > 1 && ordinal === drops.length - 1,
            dropAt: s.beats_to_drop != null ? (s.beat || 0) + s.beats_to_drop : NaN,
-           strobe: !!s.strobe, strobeDiv: s.strobe_div ?? 2, blinder: !!s.blinder, black: !!(s.black_hold || s.mode === "blackout"),
+           // the Commander's strobe, or the auto strobe in a drop (its own rate, flash length and phase)
+           strobe: !!s.strobe || !!s.strobe_auto, strobeDiv: s.strobe_auto ? s.strobe_auto.div : s.strobe_div ?? 2,
+           strobeDuty: s.strobe_auto ? s.strobe_auto.duty : 0.5, strobePhase: s.strobe_auto ? s.strobe_auto.phase : 0, blinder: !!s.blinder, black: !!(s.black_hold || s.mode === "blackout"),
            intensity: s.intensity ?? 0.8 };
 }
 const hsl = (h, s = 1, l = 0.5) => new THREE.Color().setHSL(((h % 1) + 1) % 1, s, l);
@@ -446,7 +449,7 @@ const hsl = (h, s = 1, l = 0.5) => new THREE.Color().setHSL(((h % 1) + 1) % 1, s
 // LED light is linear in that level, so read it as linear RGB, then apply the "Match real lights"
 // trims: gamma (if the fixture applies its own) and a display gain. Scale the whole colour rather
 // than clipping channels, so hues never shift; the glow shows how bright it is.
-let calib = { led: 2.5, wash: 1.0, gamma: 1.0, proj: 1.0, laser: "auto" };
+let calib = { led: 2.5, wash: 1.0, gamma: 1.0, proj: 1.0, laser: "auto", aboveHeads: true };
 function ledColour(hex, out, gain) {
   const v = parseInt(hex.slice(1), 16);
   let r = (v >> 16 & 255) / 255, g = (v >> 8 & 255) / 255, b = (v & 255) / 255;
@@ -1014,6 +1017,48 @@ function mapStrip(fx, p) {
     p.group.add(l); l.position.copy(p.group.worldToLocal(world)); l.distance = 6;   // out of the hidden holder
   });
 }
+// ------------------------------------------------------------------ music for the lasers
+// The live track's waveform on its beat grid (8 samples a beat: height, bass, mids, highs), from the
+// visuals service's /api/wave, fetched again when the track changes; and the mixer's melody
+// analysis (note, chroma, synth onsets) from showbrain's state. See musicOf() in lasershow.js.
+let wave = null, waveFetching = false, waveTried = 0;
+function wantWave(now) {
+  const title = show && show.title;
+  if (!title || waveFetching || (wave && wave.title === title) || now - waveTried < 3000 || typeof visualsBase !== "function") return;
+  waveFetching = true; waveTried = now;
+  fetch(`${visualsBase()}/api/wave`).then(r => r.ok ? r.json() : null).then(w => {
+    if (w && w.data && w.title === title) {
+      const bin = atob(w.data), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      wave = { title, spb: w.spb || 8, n: Math.floor(bytes.length / 4), bytes };
+    }
+  }).catch(() => {}).finally(() => { waveFetching = false; });
+}
+function waveSample(b) {
+  const i = Math.max(0, Math.min(wave.n - 1, Math.floor((b - 1) * wave.spb))) * 4, d = wave.bytes;
+  return { h: d[i] / 255, bass: d[i + 1] / 255, mid: d[i + 2] / 255, high: d[i + 3] / 255 };
+}
+function musicFrame(f, now) {
+  wantWave(now);
+  const mu = show && show.music, bpm = (show && show.bpm) || 128;
+  const live = !!(wave && show && wave.title === show.title);
+  return {
+    sample: live ? waveSample : null,
+    note: mu ? mu.note : null, conf: mu ? mu.conf : 0, chroma: mu ? mu.chroma : null, bright: mu ? mu.bright : null,
+    onsetBeats: mu && mu.onset_age != null ? (mu.onset_age + (now - showAt) / 1000) * bpm / 60 : null,
+  };
+}
+// Keep above heads: the lowest pitch (in the fixture's own frame, relative to its aim) that keeps a
+// beam 3 m over the audience floor across 30 m of crowd (or, mounted lower, rising over the first 2 m).
+const HEAD_CLEAR = 3.0, CROWD_DEPTH = 30;
+function laserMinPitch(fx) {
+  if (calib.aboveHeads === false) return undefined;
+  const [x, y, z] = fx.pos, [ax, ay, az] = fx.aim || [x, y, z + 1];
+  const aimPitch = Math.atan2(ay - y, Math.hypot(ax - x, az - z));
+  const world = y >= HEAD_CLEAR ? Math.atan((HEAD_CLEAR - y) / CROWD_DEPTH) : Math.atan2(HEAD_CLEAR - y, 2);
+  return world - aimPitch;
+}
+
 // ------------------------------------------------------------------ lasers
 // The look is saved with the layout; the section preview is just for this viewer.
 let laserSec = "", laserIdx = 0, laserCount = 0, laserCue = "", trackSeed = 0;
@@ -1068,7 +1113,7 @@ const cTmp = new THREE.Color();
 function update(now) {
   curPreview = pickPreview();
   const f = showFrame(now), sc = f.scene, black = f.black || sc === "PREDROP";
-  const strobeOn = f.blinder || (f.strobe && (f.strobeDiv ? ((f.frac * f.strobeDiv) % 1) < 0.5 : (now / 83) % 1 < 0.5));
+  const strobeOn = f.blinder || (f.strobe && (f.strobeDiv ? ((f.frac * f.strobeDiv + (f.strobePhase || 0)) % 1) < (f.strobeDuty ?? 0.5) : (now / 83) % 1 < 0.5));
   const kick = Math.exp(-6 * f.frac);
   const beamAmt = 0.08 + 0.55 * haze;
   // Fast effects the engine applies to every fixture. The preview arrives 25x/s, which can fall
@@ -1117,8 +1162,8 @@ function update(now) {
       p.lens.material.color.set(on ? 0xdfe8ff : 0x222222);
     } else if (fx.type === "laser") {
       const side = fx.pos[0] < -0.05 ? -1 : fx.pos[0] > 0.05 ? 1 : (laserIdx % 2 ? 1 : -1);
-      let out = laserFrame(calib.laser || "auto", laserShowFrame(f, now), {
-        side, idx: laserIdx, count: laserCount, t: now / 1000, seed: trackSeed,
+      let out = laserFrame(calib.laser || "auto", { ...laserShowFrame(f, now), music: musicFrame(f, now) }, {
+        side, idx: laserIdx, count: laserCount, t: now / 1000, seed: trackSeed, solo: laserCount === 1, minPitch: laserMinPitch(fx),
         classic: { n: Math.min(LASER_MAX, Math.max(1, fx.count || 8)), spread: THREE.MathUtils.degToRad(fx.angle || 30), rgb: new THREE.Color(fx.colour || "#19ff4a").toArray() } });
       laserIdx++; if (laserIdx === 1) laserCue = out.cue;
       if (fx.source !== "sim" && fx.source && !live) out = { level: 0, beams: [], sheet: null };   // linked but not sending: off
@@ -1323,7 +1368,8 @@ addEventListener("keydown", e => {
   else if (e.key.toLowerCase() === "a") $("#gAim").click();
 });
 
-function showCalib() { applyDay(); $("#laserLook").value = LOOKS[calib.laser] ? calib.laser : "auto"; $("#cLed").value = calib.led; $("#cWash").value = calib.wash; $("#cGamma").value = String(calib.gamma); $("#cProj").value = calib.proj ?? 1; }
+$("#aboveHeads").onclick = () => { calib.aboveHeads = calib.aboveHeads === false; showCalib(); saveRig(); };
+function showCalib() { applyDay(); $("#aboveHeads").classList.toggle("on", calib.aboveHeads !== false); $("#laserLook").value = LOOKS[calib.laser] ? calib.laser : "auto"; $("#cLed").value = calib.led; $("#cWash").value = calib.wash; $("#cGamma").value = String(calib.gamma); $("#cProj").value = calib.proj ?? 1; }
 $("#cProj").oninput = e => { calib.proj = +e.target.value; saveRig(); };
 $("#pBright").oninput = e => { const fx = cur(); if (fx) { fx.brightness = +e.target.value; $("#vBright").textContent = Math.round(fx.brightness * 100) + "%"; saveRig(); } };
 $("#cLed").oninput = e => { calib.led = +e.target.value; saveRig(); };

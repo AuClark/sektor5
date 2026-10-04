@@ -1,0 +1,32 @@
+{
+  "title": "Synthwave",
+  "about": "The outrun sunset, built from the song that's playing. The floor is the track's own waveform as glowing ridges in perspective: one beat a row, every frame of rekordbox's waveform across it (about 70 a beat), rolling in on the beat so the row under your feet is what you're hearing and the beats to come are out at the horizon. The skyline is the whole track, start to end, the played part lit and a playhead where you are. A striped sun swells on the kick; ridges are coloured by bass, mids and highs. Without a track it runs on a stand-in.",
+  "groups": [
+    {"name": "Floor", "params": [
+      {"id": "rows",    "label": "Beats ahead (rows)",       "min": 8,   "max": 48,  "step": 1,     "default": 28, "kind": "quality"},
+      {"id": "amp",     "label": "Ridge height",             "min": 0.4, "max": 2,   "step": 0.01,  "default": 0.9, "energy": 1},
+      {"id": "width",   "label": "Row width (share of the screen)", "min": 0.4, "max": 1, "step": 0.01, "default": 0.94},
+      {"id": "camh",    "label": "Camera height",            "min": 0.15, "max": 1,  "step": 0.01,  "default": 0.42},
+      {"id": "grid",    "label": "Grid",                     "min": 0,   "max": 2,   "step": 0.01,  "default": 0.8},
+      {"id": "glow",    "label": "Ridge glow",               "min": 0,   "max": 2,   "step": 0.01,  "default": 1, "energy": 1}
+    ]},
+    {"name": "Sky", "params": [
+      {"id": "horizon", "label": "Horizon",                  "min": -0.2, "max": 0.3, "step": 0.005, "default": 0.06},
+      {"id": "sun",     "label": "Sun size",                 "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "stripes", "label": "Sun stripes",              "min": 0.3, "max": 3,   "step": 0.01,  "default": 1},
+      {"id": "skyline", "label": "Whole track on the skyline", "min": 0, "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "stars",   "label": "Stars",                    "min": 0,   "max": 2,   "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Beat", "params": [
+      {"id": "punch",   "label": "Kick pulse",               "min": 0,   "max": 2,   "step": 0.01,  "default": 0.7, "energy": 1}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "pink",    "label": "Pink",                     "min": 0.86, "max": 1.0, "step": 0.005, "default": 0.93, "kind": "fixed"},
+      {"id": "cyan",    "label": "Cyan",                     "min": 0.45, "max": 0.6, "step": 0.005, "default": 0.52, "kind": "fixed"},
+      {"id": "purple",  "label": "Purple",                   "min": 0.68, "max": 0.84, "step": 0.005, "default": 0.76, "kind": "fixed"},
+      {"id": "hue",     "label": "Hue shift",                "min": -0.08, "max": 0.08, "step": 0.005, "default": 0},
+      {"id": "follow",  "label": "Follow the show's colour", "min": 0,   "max": 1,   "step": 1,     "default": 0, "kind": "fixed"},
+      {"id": "bright",  "label": "Brightness",               "min": 0,   "max": 2,   "step": 0.01,  "default": 1}
+    ]}
+  ]
+}

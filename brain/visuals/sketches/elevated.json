@@ -1,0 +1,29 @@
+{
+  "title": "Elevated",
+  "about": "A flight low over eroded mountains at dusk, after RGBA's 2009 4k demo (the technique, not its code). The land is shaped by the song: the ground along the flight is as tall as the track's waveform is loud at the beat you'll fly over it, so a loud section is a range of peaks you fly into exactly as it plays and a breakdown is a valley floor. The camera skims low through quiet parts, climbs as a drop builds and banks with the synths; the sun flares on the kick. The heavy one: lower Steps if the projector's frame rate drops.",
+  "groups": [
+    {"name": "Flight", "params": [
+      {"id": "speed",   "label": "Speed (distance a beat)",  "min": 0.2, "max": 4,   "step": 0.01,  "default": 1.3, "play": false},
+      {"id": "alt",     "label": "Altitude",                 "min": 0.5, "max": 8,   "step": 0.05,  "default": 2},
+      {"id": "climb",   "label": "Climb into the drop",      "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "bank",    "label": "Banking",                  "min": 0,   "max": 2,   "step": 0.01,  "default": 1, "energy": 1}
+    ]},
+    {"name": "Land", "params": [
+      {"id": "height",  "label": "Mountain height",          "min": 0.3, "max": 2,   "step": 0.01,  "default": 1, "energy": 1},
+      {"id": "shape",   "label": "Loud parts tower (contrast)", "min": 0.3, "max": 3, "step": 0.01, "default": 1.4},
+      {"id": "snow",    "label": "Snow",                     "min": 0,   "max": 1.5, "step": 0.01,  "default": 1},
+      {"id": "fog",     "label": "Haze",                     "min": 0.2, "max": 3,   "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Quality", "params": [
+      {"id": "steps",   "label": "Steps",                    "min": 40,  "max": 160, "step": 1,     "default": 90, "kind": "quality"},
+      {"id": "far",     "label": "View distance",            "min": 20,  "max": 150, "step": 1,     "default": 90, "kind": "quality"}
+    ]},
+    {"name": "Light", "params": [
+      {"id": "sun",     "label": "Sun",                      "min": 0,   "max": 2,   "step": 0.01,  "default": 1},
+      {"id": "punch",   "label": "Sun flare on the kick",    "min": 0,   "max": 2,   "step": 0.01,  "default": 0.6, "energy": 1},
+      {"id": "hue",     "label": "Hue shift",                "min": -0.08, "max": 0.08, "step": 0.005, "default": 0},
+      {"id": "follow",  "label": "Follow the show's colour", "min": 0,   "max": 1,   "step": 1,     "default": 0, "kind": "fixed"},
+      {"id": "bright",  "label": "Brightness",               "min": 0.3, "max": 2,   "step": 0.01,  "default": 1}
+    ]}
+  ]
+}

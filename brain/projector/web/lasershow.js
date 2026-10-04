@@ -6,8 +6,10 @@
 // stage centre, so every look is mirrored left/right; pitch > 0 is up. A sheet is a continuous plane
 // (or, when its first and last directions meet, a cone) of scanned light, like a liquid sky or tunnel.
 //
-// f is the Stage page's show frame (scene, beat, frac, progress, since, hue, intensity).
+// f is the Stage page's show frame (scene, beat, frac, progress, since, hue, intensity, energy,
+// ordinal/finale/dropAt for the director, and music: see musicOf()).
 // ctx: { side: -1 left | 1 right, idx, count (lasers in the rig), t (seconds), seed (per track),
+//        solo (the only laser, centre stage), minPitch (keep-above-heads floor in the fixture's frame),
 //        classic: { n, spread, rgb } for the "classic" look }.
 //
 // Each look picks a cue per section (intro, groove, build, drop, breakdown) and changes cue every
@@ -135,7 +137,13 @@ const CUES = {
   // Laser harp (Jean-Michel Jarre, from 1981): a fan of upright beams, plucked one at a time in a
   // little melody the program's seed writes; the others glow dim.
   harp: (f, c, o) => {
-    const n = o.n || 9, rate = o.rate || 2, step = Math.floor(f.beat * rate), since = f.beat * rate - step;
+    const n = o.n || 9, rate = o.rate || 2, m = f.music;
+    // With a clear lead note from the mix, the harp plays the actual melody: low notes on the left.
+    if (m && m.note != null && m.conf > 0.3 && !o.harpRoll) {
+      const lit = Math.max(0, Math.min(n - 1, Math.round((m.note - 48) / 48 * (n - 1)))), k0 = Math.exp(-4 * (m.onsetBeats ?? 1));
+      return { beams: beamsOf(n, o, f, c, x => [(x - 0.5) * 0.9 * o.tight + 0.1, 0.3 + 0.08 * Math.sin(f.beat * PI / 8)]).map((bm, i) => ({ ...bm, rgb: bm.rgb.map(v => v * (i === lit ? 0.45 + 0.55 * k0 : 0.12)) })) };
+    }
+    const step = Math.floor(f.beat * rate), since = f.beat * rate - step;
     const note = s => Math.floor(hash((o.seed ?? c.seed) % 9973 + (((s % 8) + 8) % 8) * 17) * n);
     const lit = note(step), prev = note(step - 1);
     return { beams: beamsOf(n, o, f, c, x => [(x - 0.5) * 0.9 * o.tight + 0.1, 0.3 + 0.08 * Math.sin(f.beat * PI / 8)]).map((bm, i) => {
@@ -185,14 +193,14 @@ const CUES = {
   shutter: (f, c, o) => {
     const n = o.n || 32, step = Math.floor(f.beat * 4);
     return { beams: beamsOf(n, o, f, c, x => [(x - 0.5) * 1.8 * o.tight + 0.2 * Math.sin(f.beat * PI / 4), -0.02])
-      .filter((bm, i) => hash(step * 13 + i * 7 + c.seed % 101) < (o.duty || 0.5)) };
+      .filter((bm, i) => hash(step * 13 + i * 7 + c.seed % 101) < (o.duty || 0.5) * (f.music ? 0.6 + 0.8 * f.music.high : 1)) };
   },
 
   // Starfield: fixed points over the crowd, each twinkling on its own 16th.
   starfield: (f, c, o) => {
     const n = o.n || 40, step = Math.floor(f.beat * 4), out = [];
     for (let i = 0; i < n; i++) {
-      if (hash(step * 3 + i * 11 + c.idx * 5) > (o.duty || 0.35)) continue;
+      if (hash(step * 3 + i * 11 + c.idx * 5) > (o.duty || 0.35) * (f.music ? 0.5 + f.music.high : 1)) continue;
       out.push({ yaw: lerp(-0.9, 1.0, hash(i * 7.3 + c.seed % 31)), pitch: lerp(-0.1, 0.45, hash(i * 3.1 + 9)), rgb: o.pal(i / n, i, f, c.t) });
     }
     return { beams: out };
@@ -202,6 +210,42 @@ const CUES = {
   crown: (f, c, o) => {
     const n = o.n || 24, rot = f.beat * PI / 8 * o.spin * c.side, R = 0.22 * o.tight * (0.85 + 0.15 * Math.exp(-5 * f.frac));
     return { beams: beamsOf(n, o, f, c, (x, i) => { const a = TAU * i / n + rot; return [0.12 + R * Math.cos(a), 0.62 + 0.12 * Math.sin(a)]; }) };
+  },
+
+  // ---- cues that follow the music, not just the beat (f.music: see musicOf()) ----
+
+  // Melody line: the lead line drawn in the air like a stave. Each note the mixer hears is a beam,
+  // higher for a higher note, newest on the right and drifting left as the next ones arrive, fading
+  // with age; a sheet joins them into one line. Without a clear lead note it traces the synths in
+  // the track's waveform (the mids), an 8th at a time.
+  melody: (f, c, o) => {
+    const m = f.music, pts = [];
+    const trail = m.trail.length ? m.trail : m.sample ? Array.from({ length: 16 }, (_, k) => {
+      const b = Math.floor(f.beat * 2) / 2 - k * 0.5; return { beat: b, h: m.sample(b).mid };
+    }) : [];
+    for (const p of trail) {
+      const age = f.beat - p.beat; if (age < 0 || age > 8) continue;
+      const h = p.note != null ? Math.min(1, Math.max(0, (p.note - 48) / 48)) : p.h;
+      pts.push({ yaw: (0.75 - age * 0.19) * o.tight, pitch: -0.02 + 0.42 * h + 0.03 * Math.sin(age * 2), k: Math.exp(-age * 0.45) });
+    }
+    if (!pts.length) return { beams: [] };
+    pts.sort((a, b) => a.yaw - b.yaw);
+    const beams = pts.map((p, i) => ({ yaw: p.yaw, pitch: p.pitch, rgb: o.pal(i / Math.max(1, pts.length - 1), i, f, c.t).map(v => v * (0.25 + 0.75 * p.k)) }));
+    const dirs = pts.length > 1 ? pts.map(p => [p.yaw, p.pitch]) : null;
+    return { beams, sheet: dirs ? { dirs, rgbA: o.pal(0, 0, f, c.t), rgbB: o.pal(1, 1, f, c.t), amount: 0.6 } : null };
+  },
+
+  // Scope: the track's own waveform hung in the air, from 2 beats ago to 6 beats ahead, scrolling
+  // as it plays: a sheet whose height is the synths (mids) with the highs as fizz on top, and a beam
+  // on every beat; the playhead beam is the brightest.
+  scope: (f, c, o) => {
+    const m = f.music; if (!m.sample) return CUES.wave(f, c, o);
+    const span = 8, b0 = f.beat - 2, H = x => { const s = m.sample(b0 + x * span); return -0.06 + 0.32 * s.mid * o.tight + 0.07 * s.high * Math.sin(x * 90 + f.beat * 6); };
+    const dir = x => [(x - 0.5) * 1.9, H(x)];
+    const beams = [];
+    for (let k = 0; k <= span; k++) { const x = (Math.ceil(b0) + k - b0) / span; if (x > 1) break;
+      const here = Math.abs(x - 2 / span) < 0.07; beams.push({ yaw: dir(x)[0], pitch: H(x), rgb: o.pal(x, k, f, c.t).map(v => v * (here ? 1 : 0.45)) }); }
+    return { beams, sheet: sheetOf(96, o, f, c, dir, 0.9) };
   },
 
   // Rise (builds): a fan lifting from the floor to the sky as the build climbs, closing in.
@@ -299,10 +343,10 @@ function pickW(r, items) {                     // [[value, weight], ...]
 
 const POOL = {
   intro:     ["sky", "knives", "searchlight", "harp", "lissajous", "rosette", "crown", "fan", "tunnel"],
-  groove:    ["fan", "wave", "tunnel", "scan", "cross", "knives", "chase", "zigzag", "helix", "grid", "harp", "searchlight", "shutter", "pyramid", "lissajous"],
-  breakdown: ["sky", "lissajous", "rosette", "harp", "searchlight", "crown", "tunnel", "helix", "pyramid"],
-  drop:      ["wave", "tunnel", "burst", "scan", "fan", "zigzag", "chase", "cross", "knives", "helix", "grid", "shutter", "starfield", "crown", "pyramid", "rosette"],
-  layer:     ["sky", "lissajous", "rosette", "starfield", "searchlight", "crown", "harp"],   // light enough to sit under a main cue
+  groove:    ["fan", "wave", "tunnel", "scan", "cross", "knives", "chase", "zigzag", "helix", "grid", "harp", "searchlight", "shutter", "pyramid", "lissajous", "melody", "scope"],
+  breakdown: ["sky", "lissajous", "rosette", "harp", "searchlight", "crown", "tunnel", "helix", "pyramid", "melody", "scope"],
+  drop:      ["wave", "tunnel", "burst", "scan", "fan", "zigzag", "chase", "cross", "knives", "helix", "grid", "shutter", "starfield", "crown", "pyramid", "rosette", "scope"],
+  layer:     ["sky", "lissajous", "rosette", "starfield", "searchlight", "crown", "harp", "melody"],   // light enough to sit under a main cue
 };
 // Per-cue parameters, drawn fresh for each program (beam counts scale with the track's energy later).
 const PARAMS = {
@@ -328,7 +372,14 @@ const PARAMS = {
   sky:        () => ({}),
   converge:   r => ({ n: pick(r, [24, 32, 40]) }),
   rise:       r => ({ n: pick(r, [20, 28, 36]) }),
+  melody:     () => ({}),
+  scope:      () => ({}),
 };
+// Cues that follow the melody and synths: favoured for a solo laser, which carries the whole show.
+const MUSICAL = new Set(["melody", "scope", "harp", "lissajous", "wave", "sky"]);
+// How far each cue sits towards stage centre (it's built for a laser at one side); a solo centre
+// laser takes it off so the cue is centred on the crowd.
+const BIAS = { tunnel: 0.12, lissajous: 0.12, rosette: 0.12, harp: 0.1, pyramid: 0.12, searchlight: 0.15, helix: 0.12, crown: 0.12, burst: 0.1, converge: 0.15 };
 // Cues symmetric about the aim line: these can run in parallel (both sides the same way).
 const SYM = new Set(["fan", "wave", "scan", "knives", "zigzag", "grid", "shutter", "harp", "searchlight", "chase", "rise", "starfield"]);
 
@@ -360,6 +411,14 @@ const COLOURS = {
   cycle: (rgb, x, i, f, s, b) => hsl(f.hue + (((Math.floor(b) % 3) + 3) % 3) / 3), // three colours, a step a beat
   accent: (rgb, x, i, f, s, b) => fr(b / 4) < 0.06 ? WHITE : rgb,                  // white on every downbeat
   ice: (rgb, x, i) => i % 3 === 0 ? ICE : rgb,
+  // The notes sounding: the strongest note's colour (round the circle of fifths, so related keys sit
+  // near each other) blending across the fan into the second strongest.
+  chroma: (rgb, x, i, f) => {
+    const ch = f.music && f.music.chroma; if (!ch) return hsl(f.hue);
+    let a = 0, b = 1; for (let k = 0; k < 12; k++) { if (ch[k] > ch[a]) { b = a; a = k; } else if (k !== a && ch[k] > ch[b]) b = k; }
+    const hue = pc => ((pc * 7) % 12) / 12, ha = hue(a), hb = hue(b), d = ((hb - ha + 1.5) % 1) - 0.5;
+    return hsl(ha + d * x * Math.min(1, ch[b] / Math.max(0.01, ch[a])));
+  },
 };
 const FILLS = ["roll", "snap", "lift", "freeze", "spin", "none"];
 const BUILDS = {
@@ -386,29 +445,33 @@ function lookPrefs(L) {
   for (const k of ["intro", "groove", "build", "breakdown", "drop"]) for (const [c] of L[k] || []) s.add(c);
   return s;
 }
-function chooseCue(r, pool, L, avoid) {
+function chooseCue(r, pool, L, avoid, solo) {
   const pref = lookPrefs(L), old = new Set(recent.flatMap(p => p.mains));
-  return pickW(r, pool.filter(c => !avoid.includes(c)).map(c => [c, (pref.has(c) ? 3 : 1) * (old.has(c) ? 0.35 : 1)]));
+  return pickW(r, pool.filter(c => !avoid.includes(c) && !(solo && c === "cross"))      // crossfire needs two sides
+    .map(c => [c, (pref.has(c) ? 3 : 1) * (old.has(c) ? 0.35 : 1) * (solo && MUSICAL.has(c) ? 2.5 : 1)]));
 }
-function phrase(r, sec, L, prev, k, last) {
+function phrase(r, sec, L, prev, k, last, solo) {
   const calm = sec === "intro" || sec === "breakdown";
-  const main = chooseCue(r, POOL[sec], L, prev ? [prev.main] : []);
-  const layerP = calm ? 0.25 : sec === "groove" ? 0.3 : 0.25 + 0.2 * k + (last ? 0.6 : 0);
-  const layer = r() < layerP ? chooseCue(r, POOL.layer, L, [main]) : null;
+  const main = chooseCue(r, POOL[sec], L, prev ? [prev.main] : [], solo);
+  const layerP = (calm ? 0.25 : sec === "groove" ? 0.3 : 0.25 + 0.2 * k + (last ? 0.6 : 0)) + (solo ? 0.15 : 0);
+  const layer = r() < layerP ? chooseCue(r, POOL.layer, L, [main], solo) : null;
   const gates = calm ? ["none", "swell", "pulse"] : sec === "groove" ? ["none", "pulse", "quarter", "offbeat", "eighth", "gallop", "tresillo", "triplet"]
     : ["none", "pulse", "quarter", "eighth", "sixteenth", "offbeat", "triplet", "tresillo", "gallop"];
   return {
     main, layer, mp: PARAMS[main](r), lp: layer ? { ...PARAMS[layer](r), dim: 0.5 } : null,
     gate: L.dropGate && sec === "drop" && r() < 0.4 ? (L.dropGate === 4 ? "sixteenth" : "eighth") : pick(r, gates),
     mask: r() < 0.5 ? "all" : pick(r, Object.keys(MASKS)),
-    colour: pickW(r, [["look", 4], ["mono", 1], ["split", 1.5], ["gradient", 1.5], ["cycle", calm ? 0.3 : 1.5], ["accent", calm ? 0 : 1], ["ice", 1]]),
-    motion: pickW(r, [["mirror", 2], ["parallel", 1], ["canon", 1]]),
+    colour: pickW(r, [["look", 4], ["mono", 1], ["split", solo ? 0 : 1.5], ["gradient", 1.5], ["cycle", calm ? 0.3 : 1.5], ["accent", calm ? 0 : 1], ["ice", 1], ["chroma", solo ? 3 : 1.5]]),
+    // Two lasers mirror, run parallel or answer each other; a solo laser sways, tilts with the
+    // swells, or follows the melody's contour with the whole show.
+    motion: solo ? pickW(r, [["still", 1], ["sway", 1], ["tilt", 1], ["follow", 2]]) : pickW(r, [["mirror", 2], ["parallel", 1], ["canon", 1]]),
+    react: 0.5 + 0.5 * r(),                                  // how hard it follows the synths and swells
     rate: calm ? pick(r, [0.5, 1]) : pick(r, [0.5, 1, 1, 2]),
     fill: calm ? pick(r, ["none", "lift", "freeze"]) : pick(r, FILLS),
     seed: (r() * 1e9) | 0,
   };
 }
-function compose(key, sec, f, L) {
+function compose(key, sec, f, L, solo) {
   if (programs.has(key)) return programs.get(key);
   let best = null, bestScore = Infinity;
   for (let tries = 0; tries < 6; tries++) {             // a few candidates; keep the one least like the recent ones
@@ -417,19 +480,20 @@ function compose(key, sec, f, L) {
     if (sec === "build") {
       const style = pick(r, Object.keys(BUILDS)), b = BUILDS[style];
       p = { sec, style, ...b, gateCurve: pick(r, Object.keys(BUILD_GATES)), colour: pick(r, ["look", "mono", "gradient", "split", "ice"]),
-            whiten: r() < 0.6, layer: r() < 0.4 ? pick(r, ["starfield", "crown", "lissajous"]) : null, motion: pickW(r, [["mirror", 3], ["parallel", 1]]),
+            whiten: r() < 0.6, layer: r() < 0.4 ? pick(r, ["starfield", "crown", "lissajous", "melody"]) : null,
+            motion: solo ? pick(r, ["still", "tilt"]) : pickW(r, [["mirror", 3], ["parallel", 1]]), react: 0.5 + 0.5 * r(),
             mains: [b.cue], seed: (r() * 1e9) | 0 };
       p.mp = { ...PARAMS[b.cue](r), ...(b.params || {}) };
     } else {
       const k = f.ordinal || 0, finale = !!f.finale, count = sec === "drop" ? 4 : 2, ph = [];
-      for (let i = 0; i < count; i++) ph.push(phrase(r, sec, L, ph[i - 1], k, finale && i === count - 1));
+      for (let i = 0; i < count; i++) ph.push(phrase(r, sec, L, ph[i - 1], k, finale && i === count - 1, solo));
       if (sec !== "drop" && r() < 0.5) ph[1] = { ...ph[0], fill: ph[1].fill, layer: ph[1].layer, lp: ph[1].lp };   // grooves often hold their cue for 8 bars
       p = { sec, phrases: ph, span: sec === "drop" ? 16 : 16, mains: ph.map(x => x.main),
             opener: sec === "drop" ? pick(r, ["burst", "slam", "curtain", "shatter", "crown", "pyramid", "none"]) : null,
             boost: sec === "drop" ? 1 + 0.2 * k + (finale ? 0.3 : 0) : 1 };
     }
     const sig = p.mains.join(","), score = recent.reduce((s, q) => s + (q.sig === sig ? 10 : 0) + p.mains.filter(m => q.mains.includes(m)).length, 0);
-    p.sig = sig;
+    p.sig = sig + (solo ? ":solo" : "");
     if (score < bestScore) { best = p; bestScore = score; }
     if (score === 0) break;
   }
@@ -446,11 +510,50 @@ const at = (f, beat) => ({ ...f, beat, frac: fr(beat) });
 function draw(cue, params, fe, ctx, base, scale) {
   const o = { ...base, ...params };
   if (o.n && scale !== 1) o.n = Math.max(2, Math.min(72, Math.round(o.n * scale)));
-  return CUES[cue](fe, ctx, o);
+  const out = CUES[cue](fe, ctx, o), b = ctx.solo ? BIAS[cue] || 0 : 0;
+  return b ? move(out, ([y, p]) => [y - b, p]) : out;
+}
+// Moves every beam and the sheet: fn([yaw, pitch]) -> [yaw, pitch].
+function move(out, fn) {
+  return { ...out, beams: out.beams.map(b => { const [yaw, pitch] = fn([b.yaw, b.pitch]); return { ...b, yaw, pitch }; }),
+           sheet: out.sheet ? { ...out.sheet, dirs: out.sheet.dirs.map(fn) } : out.sheet };
+}
+
+// ------------------------------------------------------------------ the music
+// f.music from the Stage page: sample(beat) -> { h, bass, mid, high } (0..1) from the track's own
+// waveform on its beat grid (the visuals service's /api/wave), and from the mixer's analysis of the
+// master mix: note (the lead, MIDI), conf, chroma (12 notes), bright and onsetBeats (beats since the
+// last synth onset). musicOf() adds what the cues use: the waveform here and now, swell (the
+// loudness over the last and next 2 beats: the waves), rise (louder ahead than behind), and the
+// trail of recent lead notes for the melody line.
+const trail = [];
+let lastOnset = -1e9;
+const clamp1 = v => Math.max(-1, Math.min(1, v));
+function musicOf(f) {
+  const m = f.music || {}, sample = typeof m.sample === "function" ? m.sample : null;
+  const s = sample ? sample(f.beat) : { h: 0.5, bass: 0.5, mid: 0.5, high: 0.5 };
+  let swell = 0.5, rise = 0;
+  if (sample) {
+    let back = 0, ahead = 0;
+    for (let k = -8; k < 8; k++) { const v = sample(f.beat + k * 0.25).h; if (k < 0) back += v; else ahead += v; }
+    swell = (back + ahead) / 16; rise = (ahead - back) / 8;
+  }
+  if (trail.length && trail[trail.length - 1].beat > f.beat + 0.5) trail.length = 0;         // jumped back (loop, cue)
+  const ob = m.onsetBeats != null ? f.beat - m.onsetBeats : null;
+  if (m.note != null && (m.conf || 0) > 0.3 && ob != null && Math.abs(ob - lastOnset) > 0.1) {
+    lastOnset = ob; trail.push({ note: m.note, beat: ob }); if (trail.length > 24) trail.shift();
+  }
+  while (trail.length && f.beat - trail[0].beat > 8) trail.shift();
+  const last = trail[trail.length - 1];
+  return { ...s, sample, swell, rise, note: m.note ?? null, conf: m.conf || 0, chroma: m.chroma || null, bright: m.bright ?? s.high,
+           onsetBeats: m.onsetBeats ?? 9, trail: trail.slice(),
+           // the melody's contour, -1..1: up/down from the note, left/right from where it sits in the octave
+           contourY: last ? clamp1((last.note - 66) / 18) : (s.mid - 0.5) * 2, contourX: last ? ((last.note % 12) / 11) * 2 - 1 : 0 };
 }
 
 export function laserFrame(lookId, f, ctx) {
   track(ctx.seed);
+  f = { ...f, music: musicOf(f) };
   const id = resolveLook(lookId, ctx.seed ^ trackSalt), sec = SECTION[f.scene];
   const off = { cue: "off", level: 0, beams: [], sheet: null };
   if (!sec || f.black) return off;                                          // IDLE, PREDROP blackout
@@ -462,14 +565,14 @@ export function laserFrame(lookId, f, ctx) {
   if (sec === "drop") { base = Math.round(f.beat - f.since); key = `drop:${base}`; }
   else if (sec === "build") key = `build:${Number.isFinite(f.dropAt) ? Math.round(f.dropAt) : Math.floor(f.beat / 64)}`;
   else { base = Math.floor(f.beat / 32) * 32; key = `${sec}:${base}`; }
-  const P = compose(key, sec, f, L);
+  const P = compose(key, sec, f, L, !!ctx.solo);
   rel = f.beat - base;
 
   let beams = [], sheet = null, level = LEVEL[sec], names, motion, colour, ph = null, fillK = -1;
   if (sec === "build") {
     const o = { pal, tight: 1 - 0.65 * prog, spin: 1 + (P.spinAmp || 2) * prog, seed: P.seed };
     const mp = { ...P.mp };
-    if (P.harpRoll) mp.rate = [1, 2, 4, 8, 16][Math.min(4, Math.floor(prog * 5))];
+    if (P.harpRoll) { mp.rate = [1, 2, 4, 8, 16][Math.min(4, Math.floor(prog * 5))]; mp.harpRoll = true; }
     let out = draw(P.cue, mp, f, ctx, o, scale);
     beams = out.beams; sheet = out.sheet || null;
     if (P.countIn) beams = beams.slice(0, Math.max(1, Math.ceil(beams.length * (0.08 + 0.92 * prog))));
@@ -509,11 +612,24 @@ export function laserFrame(lookId, f, ctx) {
     if (fillK >= 0 && ph.fill === "roll") level *= fr(f.beat * (fillK < 0.5 ? 4 : 8)) < 0.5 ? 1 : 0;
     if (fillK >= 0.75 && ph.fill === "snap") level = 0;
   }
+  // Following the music: the whole show lifts with the swells and spreads with the synths, a synth
+  // stab punches it up, and a solo laser sways, tilts or follows the melody's contour.
+  const m = f.music, R = (ph || P).react ?? 0.7;
+  let shaped = move({ beams, sheet }, ([y, p]) => [y * (0.85 + 0.3 * m.mid * R), p + (m.swell - 0.5) * 0.14 * R]);
+  if (motion === "sway") shaped = move(shaped, ([y, p]) => [y + 0.22 * Math.sin(f.beat * PI / 8), p]);
+  else if (motion === "tilt") shaped = move(shaped, ([y, p]) => [y, p + 0.05 * Math.sin(f.beat * PI / 16) + 0.12 * m.rise]);
+  else if (motion === "follow") shaped = move(shaped, ([y, p]) => [y + 0.18 * m.contourX * R, p + 0.1 * m.contourY * R]);
+  // Keep above heads: nothing below the floor the Stage page works out for this fixture.
+  if (Number.isFinite(ctx.minPitch)) shaped = move(shaped, ([y, p]) => [y, Math.max(ctx.minPitch, p)]);
+  beams = shaped.beams; sheet = shaped.sheet;
+  level *= 1 + 0.5 * R * Math.exp(-5 * m.onsetBeats);
+  if (sec === "intro" || sec === "breakdown") level *= 0.75 + 0.5 * m.h;
   const cmap = COLOURS[colour] || COLOURS.look, n = beams.length;
   beams = beams.map((b, i) => {
     const dim = Math.max(b.rgb[0], b.rgb[1], b.rgb[2]);                    // keep a cue's own dimming (harp, layers)
     let rgb = colour === "look" ? b.rgb : cmap(b.rgb, n > 1 ? i / (n - 1) : 0.5, i, f, ctx.side, f.beat);
     if (colour !== "look" && colour !== "accent" && colour !== "ice") rgb = rgb.map(v => v * dim);
+    rgb = rgb.map(v => Math.min(1, v));
     return { ...b, rgb: noYellow(rgb) };
   });
   if (sheet) sheet = { ...sheet, rgbA: noYellow(sheet.rgbA), rgbB: noYellow(sheet.rgbB) };
