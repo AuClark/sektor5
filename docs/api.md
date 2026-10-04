@@ -76,6 +76,7 @@ From `showbrain`. `null` if the show engine isn't running.
 | `scene` | `IDLE`, `INTRO`, `GROOVE`, `BREAKDOWN`, `BUILD`, `HOLD`, `PREDROP`, `DROP`, `OUTRO`, `PAUSED` |
 | `live` | The deck the lights are following. `follow` is 0 for auto, or a locked deck number. |
 | `live_reason` | Why that deck, e.g. `mixer: deck 2 holds 84% of the mix`, `locked in Commander`, `deck state (no mixer data)` |
+| `auto_strobe`, `strobe_auto` | Whether the auto strobe may strobe drops, and while it flashes `{"div", "duty", "phase"}` (a flash is on while `(frac × div + phase) mod 1 < duty`), else `null`. See show-engine.md, "Auto strobe". |
 | `mixer_share` | Smoothed share of the mix per player (`{"1": 0.93, "2": 0.07}`), as used for the decision |
 | `title`, `bpm`, `hue` (0-1, from the track's key) | Live deck's track, tempo and colour |
 | `bar`, `bwb` (beat in bar), `beat` (fractional), `frac` (0-1 phase within the beat) | Beat clock |
