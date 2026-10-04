@@ -39,7 +39,7 @@ Learned from Holoscope 2.5.2 (`javainterface.OpenAndroidAlbum`, a Qt app; the lo
 | `5A 8D …` | device info: its name, MAC (`a0:dd:6c:…`, an ESP32), the router it was told to join |
 | `5A 84 …` | file list, names separated by `/` |
 
-**Joining a home network:** the fan stores the network (it shows in its `5A 8D` info) but didn't connect to the home Wi-Fi tried on 4 Oct, through the app or this tool, even after a restart. It's 2.4 GHz only; try a 2.4 GHz WPA2 network. Until then, the brain would reach it on its own network through a second Wi-Fi adapter.
+**Joining a home network:** `5A 8B` is the app's `routerset` (`5A 8A`, `wifiset`, renames the fan's own hotspot). Its second-to-last byte is the XOR of bytes 2–65; before 4 Oct our controller sent 0 there. With the checksum right the fan answers `5A 1E 1E F5` and stores the router (it shows in `5A 8D`), but on 4 Oct it still never joined FT Home (2.4 GHz, channel 6, WPA2): not after the join, not after a power cycle, and its hotspot stayed up. The app's own attempt failed the same way. So treat the fan as hotspot-only: the brain reaches it through a second Wi-Fi adapter joined to the fan's hotspot (never the default route), keeping its main network as it is.
 
 ## Uploads (not done)
 
