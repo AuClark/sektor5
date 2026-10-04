@@ -181,7 +181,7 @@ Robustness:
 
 **Colour from the visuals:** with the palette on `visuals`, the lights take the main colour of the projected picture. The first projector's output page shrinks each frame it has just drawn to 32×18 pixels about every 400 ms. It builds a hue histogram weighted by saturation × brightness, so dark and grey pixels don't count, and posts the strongest hue to the projector service (`/api/colour`). The projector service passes it on to showbrain (`POST /api/visual_colour`, open like `/api/screen`: it only stores the colour). Showbrain glides the lights' hue to it over about half a second, the short way round the colour wheel. Too little colour on screen sends `null`: the lights hold the last colour, then go back to the track's key colour after 5 s without a reading. `visual` in the state shows the latest reading and its age. On the Lighting page it's the **Visuals** colour button; in the Show app, **From the visuals**.
 
-API: `POST /api/cmd {"cmd": ..., "value": ...}` with `mode`, `follow`, `intensity`, `lead_ms`, `hold`, `strobe`, `strobe_div`, `blinder`, `black_hold`, `flash`, `look`, `play` (`AUTO`, `together`, `alternate`, `swap`, `bounce`, `chase`, `out`, `in`), `palette` (`{"mode", "hue"}`; mode `auto` (track key), `lock`, `cycle` or `visuals`), `speed`, `fixture` (`{"name", "on", "level"}`), `tap`, `tap_bpm`, `tap_sync`, `drop_now`, `build`, `skip_drop`, `mark_drop`, `clear`.
+API: `POST /api/cmd {"cmd": ..., "value": ...}` with `mode`, `follow`, `intensity`, `lead_ms`, `hold`, `strobe`, `strobe_div`, `wave_lights` (`auto`, `on`, `off`), `blinder`, `black_hold`, `flash`, `look`, `play` (`AUTO`, `together`, `alternate`, `swap`, `bounce`, `chase`, `out`, `in`), `palette` (`{"mode", "hue"}`; mode `auto` (track key), `lock`, `cycle` or `visuals`), `speed`, `fixture` (`{"name", "on", "level"}`), `tap`, `tap_bpm`, `tap_sync`, `drop_now`, `build`, `skip_drop`, `mark_drop`, `clear`.
 
 ## Dashboard: waveforms and library
 
@@ -251,6 +251,18 @@ Those values are examples, not the DJM-450's. To find the real ones, move one co
 - Recording starts after 3 s of music (keeping 3 s of pre-roll) and stops after 90 s of silence. It won't start with less than 2 GB free.
 - Next to each recording it writes a tracklist, `set-….txt` and `set-….cue`, of the deck the lights follow, with timestamps.
 - `S5_REC=off` in the mixer service's environment turns it off.
+
+## Waveform lights
+
+The lights can draw the track itself: rekordbox's colour waveform at full detail (150 frames a second), which showbrain fetches with each track's timeline (`/api/wavedetail/N`) and reads at the playhead, ahead by the output latency (`looks.py`, "waveform lights"):
+
+- **Tubes:** the next two beats of the waveform fall down the tube and land at the bottom as you hear them (a flipped tube runs the other way).
+- **Leg pyramids:** each leg a level meter: bass, mids, highs and everything, with a bright cap; the laser keeps its drop rhythm.
+- **Panel:** a scrolling waveform, rekordbox-style: a beat ago on the left, a beat to come on the right, the playhead in the middle.
+- **Par can:** coloured and dimmed by the bands.
+- Bass, mids and highs take the three palette colours (so no yellow), mixed like rekordbox's red, green and blue.
+
+**When:** `auto` picks it for some phrases by the track: about 30% of 8-bar groove phrases, 35% of intro, outro and breakdown phrases, and 25% of a drop's 4-bar phrases after its first bar. Never in a build, a hold or the pre-drop, which have their own looks; a track without a waveform never uses it. `on` draws it whenever it can, `off` never. Commander: **Waveform lights** (Performance), `{"cmd": "wave_lights", "value": "auto" | "on" | "off"}`; the state reports `wave_lights` and `wave_now`; the default is `wave_lights` in `config.json`.
 
 ## Smoke safety (non-negotiable)
 

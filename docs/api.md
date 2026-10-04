@@ -76,6 +76,7 @@ From `showbrain`. `null` if the show engine isn't running.
 | `scene` | `IDLE`, `INTRO`, `GROOVE`, `BREAKDOWN`, `BUILD`, `HOLD`, `PREDROP`, `DROP`, `OUTRO`, `PAUSED` |
 | `live` | The deck the lights are following. `follow` is 0 for auto, or a locked deck number. |
 | `live_reason` | Why that deck, e.g. `mixer: deck 2 holds 84% of the mix`, `locked in Commander`, `deck state (no mixer data)` |
+| `wave_lights`, `wave_now` | The waveform-lights mode (`auto`, `on`, `off`) and whether the lights are drawing the track's waveform this moment. See show-engine.md, "Waveform lights". |
 | `mixer_share` | Smoothed share of the mix per player (`{"1": 0.93, "2": 0.07}`), as used for the decision |
 | `title`, `bpm`, `hue` (0-1, from the track's key) | Live deck's track, tempo and colour |
 | `bar`, `bwb` (beat in bar), `beat` (fractional), `frac` (0-1 phase within the beat) | Beat clock |

@@ -165,6 +165,8 @@
   </div>
   <label>Strobe rate (locked to the beat)</label>
   <div class="seg" id="sdiv"><button data-v="1">1/4</button><button data-v="2">1/8</button><button data-v="4">1/16</button><button data-v="0">Free</button></div>
+  <label>Waveform lights <span id="waveinfo" class="dim"></span></label>
+  <div class="seg" id="wavel" title="The lights draw the track's own waveform: tubes, pyramid meters, the panel's scrolling waveform"><button data-v="auto">Auto</button><button data-v="on">On</button><button data-v="off">Off</button></div>
   <label>Mixer reactions <span id="mixinfo" class="dim"></span></label>
   <button id="mixreact" style="width:100%" onclick="cmd('mixer_react', !(S.mix && S.mix.react))" title="Lights react to the DJM: bass kill, fader level, Beat FX, filter">Mixer react</button>
   <label>Motion speed</label>
@@ -247,6 +249,7 @@ const segOn = (id, v) => document.querySelectorAll(`#${id} button`).forEach(b =>
 segs('mode', v => cmd('mode', v));
 segs('follow', v => cmd('follow', +v));
 segs('sdiv', v => cmd('strobe_div', +v));
+segs('wavel', v => cmd('wave_lights', v));
 segs('speed', v => cmd('speed', +v));
 segs('pmode', v => cmd('palette', {mode: v}));
 segs('bbars', v => { $('bbars').dataset.v = v; $('bbl').textContent = v; segOn('bbars', v); });
@@ -333,7 +336,8 @@ async function poll() {
     document.querySelectorAll('#beats div').forEach((b, i) => b.classList.toggle('on', S.bwb === i + 1 && S.scene !== 'IDLE'));
     $('hold').classList.toggle('on', !!S.hold);
     $('black').classList.toggle('on', S.mode === 'blackout');
-    segOn('mode', S.mode); segOn('follow', S.follow); segOn('sdiv', S.strobe_div); segOn('speed', S.speed);
+    segOn('mode', S.mode); segOn('follow', S.follow); segOn('sdiv', S.strobe_div); segOn('wavel', S.wave_lights);
+    $('waveinfo').textContent = S.wave_now ? '· drawing it now' : S.wave_lights === 'auto' ? '· some phrases' : ''; segOn('speed', S.speed);
     const mx = S.mix || {};
     $('mixreact').classList.toggle('on', !!mx.react);
     $('mixinfo').textContent = !mx.connected ? '· no mixer data' : [mx.bass_out && 'BASS OUT', mx.fx && 'FX ON',

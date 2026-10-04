@@ -5,6 +5,7 @@
   "lead_ms": 40,
   "intensity": 1.0,
   "drop_bars": 16,
+  "wave_lights": "auto",
   "fixtures": [
     {
       "name": "tube1",
