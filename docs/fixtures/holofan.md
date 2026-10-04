@@ -90,3 +90,16 @@ Recorded with the USB relay (`relay-try3.bin`, not in git): one picture (`im_ali
 - A video taken from the app's own file list (try 2) made the fan drop the connection 1 s in; the gallery video in try 3 was fine. Not explained yet.
 
 Next: decode the 288-byte row layout against `im_alive.png`, then build the same 141,120 bytes from the image and upload it with our own controller.
+
+### Router join: what was tried (4 Oct, evening)
+
+None of these got the fan onto another network; it always came back on its own hotspot.
+- App → router settings, FT Home (correct password, checked in logcat): fan acks, restarts, `5A 8D` shows the router, never joins.
+- Our controller with the fixed checksum: identical result (our `5A 8B` matches the app's byte for byte).
+- A plain 2.4 GHz Pixel hotspot (`fantest`, 2.4 + 5 GHz bands, auto-off disabled) via the app and via our controller, with power cycles: never joined.
+- `master:off` (`5A 20 20 F5`, `DeviceInterface::master(false)`; `5A 1F 1F F5` is master on) before the join and a power cycle: never joined. **The fan was left with master off**; send `master:on` to restore it.
+- Renaming the fan's own hotspot works (`5A 8A`, `wifiset`): it's now **Rave-fan** / 12345678 on channel 1–3; the scripts default to that (`FAN_SSID`, `FAN_PW`).
+
+Unexplored: the app's stitch (multi-fan) settings, which may be where router mode actually applies. Otherwise: a second Wi-Fi adapter on the brain, joined only to Rave-fan.
+
+Working files outside the repo: decompiles, strings and the APK in `~/tools/holo-decomp/`; the Ghidra project in `~/tools/gproj/holo` (scripts in `~/tools/gscripts/`).
