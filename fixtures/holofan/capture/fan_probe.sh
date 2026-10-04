@@ -4,6 +4,7 @@
 #   sudo -v && fan_probe.sh "<home ssid>" "<home password>"
 FAN_SSID="${FAN_SSID:-Rave-fan}"; FAN_PW="${FAN_PW:-12345678}"; HOME_SSID="$1"; HOME_PW="$2"; FAN=192.168.4.1
 CAPTURE_SECS=30; STEPS=7; T0=$(date +%s)
+case "$HOME_PW" in ""|"<"*">") echo "Give your real home Wi-Fi name and password: fan_probe.sh \"<ssid>\" \"<password>\""; exit 1;; esac
 exec > >(tee ~/fan-probe.txt) 2>&1
 
 elapsed() { local s=$(( $(date +%s) - T0 )); printf "%d:%02d" $((s / 60)) $((s % 60)); }
@@ -63,11 +64,11 @@ if [ -n "$SUDO" ]; then
   tcpdump -n -r "$HOME/fan-probe.pcap" "src host $FAN and not icmp and not arp" 2>/dev/null | head -20 | sed 's/^/   /'
 else note "skipped (needs sudo)"; fi
 
-step 3 "Scanning the 1,000 most common TCP ports plus the usual ESP32 ones (what the fan listens on)"
+step 3 "Scanning TCP ports 1-1024 plus the usual ESP32 ones, about 1,050 in all (what the fan listens on)"
 # The fan ignores closed ports instead of refusing them, so every miss is a timeout: keep the list short
 # and the waits small (it's one Wi-Fi hop away). ESP32 extras: 3232 ArduinoOTA, 8266, 6666 app, 23 telnet...
 ESP_PORTS="21,22,23,53,80,81,443,554,1883,2323,3232,5000,5555,6666,6667,7777,8000,8080,8081,8088,8266,8443,8888,8988,9000,9999,23456,50000"
-nmap -Pn -sT --top-ports 1000 -p "T:$ESP_PORTS" -T4 --max-retries 0 --initial-rtt-timeout 80ms --max-rtt-timeout 250ms \
+nmap -Pn -sT -p "T:1-1024,$ESP_PORTS" -T4 --min-parallelism 64 --max-retries 0 --initial-rtt-timeout 80ms --max-rtt-timeout 250ms \
      --host-timeout 4m --stats-every 10s -oN "$HOME/fan-ports.txt" $FAN 2>&1 | nmap_progress
 OPEN=$(grep -E "^[0-9]+/tcp +open" "$HOME/fan-ports.txt" | cut -d/ -f1 | paste -sd, -)
 note "open TCP ports: ${OPEN:-none}"
