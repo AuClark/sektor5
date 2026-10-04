@@ -10,7 +10,7 @@ that connection: 5A <cmd> [arg] <check> F5 (check = the last byte before F5 repe
     holofan.py join "SSID" "PASSWORD"     # move the fan onto a Wi-Fi network (2.4 GHz)
     holofan.py upload PICTURE [--play]    # convert a picture (encode.py) and add it to the fan's clips
 
-CMDs: on off play pause loop1 loopall bright:N(0-255) clip:N volume:N
+CMDs: on off play pause loop1 loopall bright:N(0-255) clip:N volume:N master:on|off
 Never sent (destructive): format card (07), factory reset (08), delete clip (80).
 
 Run it on the fan's own Wi-Fi (SSID 3D-PD42-..., default password 12345678; the fan is 192.168.4.1), or on a
@@ -43,10 +43,11 @@ def parse(c):
     if c in COMMANDS:
         return COMMANDS[c]
     k, _, v = c.partition(":")
-    v = int(v)
+    v = {"on": 1, "off": 0}.get(v, v); v = int(v)
     if k == "bright": return frame(0x81, max(0, min(255, v)))
     if k == "clip": return frame(0x87, v + 1)
     if k == "volume": return frame(0x90, max(0, min(255, v)))
+    if k == "master": return frame(0x1F if v else 0x20)       # DeviceInterface::master(bool); untested what it changes
     raise SystemExit(f"unknown command {c!r}")
 
 

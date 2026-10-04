@@ -11,13 +11,13 @@ done
 echo "== on fan wifi: router $(ipconfig getoption en0 router), me $(ipconfig getifaddr en0)"
 if [ "$(ipconfig getoption en0 router)" = "192.168.4.1" ]; then
   "$PY" - "$FIX" "$HOME_SSID" "$HOME_PW" <<'PY'
-import sys, time, threading; sys.path.insert(0, sys.argv.pop(1)); import holofan as h
+import os, sys, time, threading; sys.path.insert(0, sys.argv.pop(1)); import holofan as h
 conn = h.wait_for_fan(45)
 if not conn: print("== no fan connection"); sys.exit()
 threading.Thread(target=h.reader, args=(conn,), daemon=True).start()
 stop = threading.Event(); threading.Thread(target=h.keepalive, args=(conn, stop), daemon=True).start(); time.sleep(8)
 print("== still connected after 8 s with the heartbeat")
-for c in ("bright:255",):
+for c in os.environ.get("PRE", "bright:255").split():
     f = h.parse(c); print("== send", c, f.hex(" ")); conn.sendall(f); time.sleep(3)
 f = h.join_frame(sys.argv[1], sys.argv[2]); print("== send join", sys.argv[1], len(f), "B"); conn.sendall(f); time.sleep(5)
 conn.close()
