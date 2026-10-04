@@ -169,7 +169,7 @@
       <label title="Shift the picture inside the surface without moving its corners">Picture across <span id="vOx"></span></label><input id="pOx" type="range" min="-0.5" max="0.5" step="0.005">
       <label>Picture up / down <span id="vOy"></span></label><input id="pOy" type="range" min="-0.5" max="0.5" step="0.005">
       <label title="How big the picture is inside the surface (its corners stay put)">Picture zoom <span id="vZm"></span></label><input id="pZm" type="range" min="0.5" max="2.5" step="0.01">
-      <div class="row" style="margin-top:6px"><button id="bFill">Fill screen</button><button id="bCentre" title="Put the picture back in the middle of the surface, at 100%">Reset picture</button><button id="bReset">Reset corners</button><button id="bSel">Next corner ↻</button></div>
+      <div class="row" style="margin-top:6px"><button id="bFill">Fill screen</button><button id="bCentre" title="Put the picture back in the middle of the surface, at 100%">Reset picture</button><button id="bKeep" title="Keep this position and zoom for the sketch on this surface; other sketches keep their own">Keep</button><button id="bForget" title="Drop the kept position for this sketch">Forget</button><button id="bReset">Reset corners</button><button id="bSel">Next corner ↻</button></div>
     </div>
     <div class="card">
       <h3>Masks</h3>
@@ -436,9 +436,26 @@ const SHAPE = [["pRad", "radius", 0, v => v.toFixed(3)], ["pBw", "border", 0, v 
                ["pOy", "off_y", 0, v => Math.abs(v) < 0.0025 ? "centred" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? "down" : "up"}`],
                ["pZm", "zoom", 1, v => Math.round(v * 100) + "%"]];
 const shapeLabel = (sl, v) => { const d = SHAPE.find(x => x[0] === sl); $("v" + sl.slice(1)).textContent = d[3](v); };
+// The picture's position and zoom belong to the sketch on the surface now (render.js fitOf): moving one
+// starts from where that sketch sits, and marks the draft as this sketch's.
+const FIT = { pOx: 0, pOy: 1, pZm: 2 };
+const fkey = s => fitKey(s, R.liveSketch);
 for (const [sl, key] of SHAPE)
-  $(sl).oninput = e => { const s = sel(); if (s) { s[key] = +e.target.value; shapeLabel(sl, s[key]); push(); } };
-$("bCentre").onclick = () => { const s = sel(); if (s) { s.off_x = 0; s.off_y = 0; s.zoom = 1; push(true); ui(); } };
+  $(sl).oninput = e => { const s = sel(); if (!s) return;
+    if (sl in FIT) { const f = fitOf(s, fkey(s)); [s.off_x, s.off_y, s.zoom] = f; s.off_for = fkey(s); }
+    s[key] = +e.target.value; shapeLabel(sl, s[key]); paintKeep(); push(); };
+function paintKeep() {
+  const s = sel(); if (!s) return;
+  const k = fkey(s), f = fitOf(s, k), kept = (s.fit || {})[k], nm = k || "this sketch";
+  const same = kept ? f.every((v, i) => Math.abs(v - kept[i]) < 1e-4) : Math.abs(f[0]) < 1e-4 && Math.abs(f[1]) < 1e-4 && Math.abs(f[2] - 1) < 1e-4;
+  $("bKeep").textContent = same && kept ? `Kept for ${nm} ✓` : `Keep for ${nm}`;
+  $("bKeep").classList.toggle("on", !same);
+  $("bForget").style.display = kept ? "" : "none";
+}
+$("bCentre").onclick = () => { const s = sel(); if (s) { s.off_x = 0; s.off_y = 0; s.zoom = 1; s.off_for = fkey(s); push(true); ui(); } };
+$("bKeep").onclick = () => { const s = sel(); if (!s) return; const k = fkey(s); s.fit = Object.assign({}, s.fit, { [k]: fitOf(s, k) }); push(true); ui(); };
+$("bForget").onclick = () => { const s = sel(); if (!s) return; const k = fkey(s), f = Object.assign({}, s.fit); delete f[k]; s.fit = f;
+  s.off_x = 0; s.off_y = 0; s.zoom = 1; s.off_for = k; push(true); ui(); };
 $("pLead").oninput = e => { L.lead_ms = +e.target.value; $("vLead").textContent = L.lead_ms; push(); };
 $("pRs").onchange = e => { L.render_scale = +e.target.value; push(true); };
 $("pBr").oninput = e => { L.brightness = +e.target.value; $("vBr").textContent = Math.round(L.brightness * 100) + "%"; push(); };
@@ -509,7 +526,9 @@ function ui() {
     if (document.activeElement !== $("pName")) $("pName").value = s.name || "";
     $("pOp").value = s.opacity; $("pHue").value = s.hue_shift || 0;
     $("vOp").textContent = Math.round(s.opacity * 100) + "%"; $("vHue").textContent = (s.hue_shift || 0).toFixed(2);
-    for (const [sl, key, dflt] of SHAPE) { const v = s[key] ?? dflt; $(sl).value = v; shapeLabel(sl, v); }
+    const fit = fitOf(s, fkey(s));
+    for (const [sl, key, dflt] of SHAPE) { const v = sl in FIT ? fit[FIT[sl]] : s[key] ?? dflt; $(sl).value = v; shapeLabel(sl, v); }
+    paintKeep();
   }
   $("pLead").value = L.lead_ms; $("vLead").textContent = L.lead_ms;
   $("pRs").value = String(L.render_scale || 0);

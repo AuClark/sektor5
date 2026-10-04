@@ -100,6 +100,19 @@ def coord(v):
     return max(-0.5, min(1.5, float(v)))     # a little overscan allowed for alignment
 
 
+def clean_fit(f):
+    """Positions kept per sketch on a surface (Set in the editor or Focus): {name: [x, y, zoom]}."""
+    out = {}
+    if isinstance(f, dict):
+        for k, v in list(f.items())[:64]:
+            try:
+                if isinstance(k, str) and SAFE_NAME.match(k) and isinstance(v, (list, tuple)) and len(v) == 3:
+                    out[k] = [max(-1.0, min(1.0, float(v[0]))), max(-1.0, min(1.0, float(v[1]))), max(0.25, min(4.0, float(v[2])))]
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
 def clean_layout(d):
     """Validate and normalise a layout coming from the editor."""
     out = json.loads(json.dumps(DEFAULT_LAYOUT))
@@ -135,6 +148,8 @@ def clean_layout(d):
             "off_x": float(max(-1.0, min(1.0, s.get("off_x", 0.0) or 0.0))),         # the picture's position in the surface:
             "off_y": float(max(-1.0, min(1.0, s.get("off_y", 0.0) or 0.0))),         # + right / down, in surface widths / heights
             "zoom": float(max(0.25, min(4.0, s.get("zoom", 1.0) or 1.0))),            # the picture's size in it (1 = as made)
+            "off_for": name_or_none(s.get("off_for")),   # the sketch (or content) that position is being set on
+            "fit": clean_fit(s.get("fit")),              # positions kept per sketch: {name: [x, y, zoom]}
             "border": float(max(0.0, min(0.15, s.get("border", 0.0)))),             # border band width
             "border_bright": float(max(0.0, min(2.0, s.get("border_bright", 1.0)))),
             "border_sat": float(max(0.0, min(1.0, s.get("border_sat", 0.0)))),      # 0 white .. 1 show colour

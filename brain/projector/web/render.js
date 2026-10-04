@@ -86,6 +86,17 @@ class ShowClock {
 //
 // duty (0..1, default 0.5) is how much of a square's cycle is spent at the top. Down at 0.15 it
 // is a strobe rather than a chop, which is what the Launchpad's STROBE pad wants.
+// Where a surface's picture sits, for what it's showing now ("key": the sketch's name, or a built-in
+// content): the position being adjusted if it was made on this sketch (off_x / off_y / zoom with
+// off_for), else the one kept for this sketch with Set ("fit": {key: [x, y, zoom]}), else centred.
+// So each sketch keeps its own place on a surface, and a change of sketch never carries one over.
+function fitOf(s, key) {
+  if (s.off_for === key) return [s.off_x || 0, s.off_y || 0, s.zoom || 1];
+  const f = s.fit && s.fit[key];
+  return f ? [f[0] || 0, f[1] || 0, f[2] || 1] : [0, 0, 1];
+}
+const fitKey = (s, liveName) => s.content === "gen" ? s.sketch || liveName || "" : s.content;
+
 // What the renderer keeps of a setting's schema: enough to clamp it, automate it and play it.
 const specOf = (p, timed) => ({ id: p.id, label: p.label || "", min: p.min, max: p.max, step: p.step, kind: p.kind || "",
                                 energy: p.energy, play: p.play, timed: !!(timed && timed.has(p.id)) });
@@ -925,7 +936,8 @@ class MapRenderer {
     gl.uniform2f(u.u_res, W, H);
     gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners, s.shape))));
     gl.uniform1f(u.u_tri, s.corners.length === 3 ? 1 : 0);
-    gl.uniform2f(u.u_off, s.off_x || 0, s.off_y || 0); gl.uniform1f(u.u_zoom, s.zoom || 1);
+    const fit = fitOf(s, pr.name || s.content);   // a gen program knows its sketch (the outgoing one too, in a transition)
+    gl.uniform2f(u.u_off, fit[0], fit[1]); gl.uniform1f(u.u_zoom, fit[2]);
     gl.uniform1f(u.u_dia, isDiamond(s) ? 1 : 0);
     const xs = s.corners.map(c => c[0]), ys = s.corners.map(c => c[1]);
     gl.uniform4f(u.u_box, 2 * Math.min(...xs) - 1, 1 - 2 * Math.max(...ys), 2 * Math.max(...xs) - 1, 1 - 2 * Math.min(...ys));

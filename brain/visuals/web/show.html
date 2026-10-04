@@ -227,6 +227,11 @@
   .dpad button svg { width: 18px; height: 18px; }
   .dpad button:active, .dpad button.held { background: var(--text); color: var(--on); }
   .dpad .mid { font-size: 10px; font-weight: 600; color: var(--dim); }
+  .keep { display: flex; gap: 6px; margin-top: 8px; }
+  .keepbtn { flex: 1; height: 40px; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text); font: 600 14px var(--font); }
+  .keepbtn.attn { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .keepbtn.done { color: var(--dim); }
+  .keepst { font-size: 12px; color: var(--dim); margin-top: 5px; }
   .zoomrow { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 4px; margin-bottom: 8px; }
   .zoomrow button { height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text);
                     font: 600 13px var(--font); font-variant-numeric: tabular-nums; touch-action: none; }
@@ -645,6 +650,8 @@
           <button data-z="-1" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"/></svg></button><button id="zoomV" title="Back to 100%">100%</button><button data-z="1" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
         </div>
         <div class="seg sm" id="nudgeStep" title="How far one tap moves or zooms it"><button data-v="0.005">Fine</button><button data-v="0.02">Normal</button><button data-v="0.08">Big</button></div>
+        <div class="keep"><button class="keepbtn" id="keepBtn" title="Keep this position and size for this sketch on this surface; other sketches keep their own">Set</button><button class="chipbtn" id="forgetBtn" hidden title="Drop the kept position: back to centred">Forget</button></div>
+        <div class="keepst" id="keepSt"></div>
       </div>
       <div class="fonote" id="foNote" hidden></div>
       <div class="nonly energyblk fo">
@@ -1182,7 +1189,7 @@ function useLayout(l) {
   if (SEL && !TG()) SEL = null;                          // its surface went (deleted in the editor)
   if (NUDGE) {                                           // a nudge still settling: keep it, not the poll's older copy
     const x = mineS().find(y => y.id === NUDGE.id);
-    if (x && performance.now() < NUDGE.until) { x.off_x = NUDGE.x; x.off_y = NUDGE.y; x.zoom = NUDGE.z; } else NUDGE = null;
+    if (x && performance.now() < NUDGE.until) { x.off_x = NUDGE.x; x.off_y = NUDGE.y; x.zoom = NUDGE.z; x.off_for = NUDGE.key; } else NUDGE = null;
   }
   paintTarget();
 }
@@ -1226,7 +1233,14 @@ const pinTo = (n, preset = null) => x => Object.assign(x, n ? { content: "gen", 
 // later; while it's settling, the layout poll can't snap it back.
 let NUDGE = null, nTimer = 0, nStep = +localStorage.getItem("s5nudge") || 0.02;
 const NMAX = 0.5;
-const offOf = t => NUDGE && NUDGE.id === t.id ? NUDGE : { x: t.off_x || 0, y: t.off_y || 0, z: t.zoom || 1 };
+// Each sketch keeps its own place on a surface (render.js fitOf): what's adjusted here is a draft for the
+// sketch on it now, and Set keeps it in the surface's "fit" for that sketch.
+const keyOf = t => fitKey(t, SK && SK.name);
+const offOf = t => { if (NUDGE && NUDGE.id === t.id && NUDGE.key === keyOf(t)) return NUDGE;
+  const f = fitOf(t, keyOf(t)); return { x: f[0], y: f[1], z: f[2] }; };
+const keptOf = t => (t.fit || {})[keyOf(t)] || null;
+const sameFit = (o, k) => k ? Math.abs(o.x - k[0]) < 1e-4 && Math.abs(o.y - k[1]) < 1e-4 && Math.abs(o.z - k[2]) < 1e-4 : Math.abs(o.x) < 1e-4 && Math.abs(o.y) < 1e-4 && Math.abs(o.z - 1) < 1e-4;
+const keyName = t => t.content === "gen" ? titleOf(keyOf(t)) : BUILT[t.content] || t.content;
 const offWords = o => { const w = (v, a, b) => Math.abs(v) < 0.0025 ? "" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? b : a}`;
   return [w(o.x, "left", "right"), w(o.y, "up", "down")].filter(Boolean).join(", ") || "centred"; };
 function paintNudge() {
@@ -1239,18 +1253,25 @@ function paintNudge() {
   $("nudgeV").textContent = offWords(o);
   $("xyDot").style.left = (50 + o.x / NMAX * 50) + "%"; $("xyDot").style.top = (50 + o.y / NMAX * 50) + "%";
   $("zoomV").textContent = Math.round(o.z * 100) + "%";
+  const kept = keptOf(t), saved = sameFit(o, kept), nm = keyName(t);
+  $("keepBtn").textContent = saved && kept ? "Kept ✓" : `Set for ${nm}`;
+  $("keepBtn").classList.toggle("attn", !saved); $("keepBtn").classList.toggle("done", saved && !!kept);
+  $("forgetBtn").hidden = !kept;
+  $("keepSt").textContent = saved ? (kept ? `${nm} sits here on ${t.name || t.id}; other sketches keep their own.` : `${nm} is centred here (nothing kept).`)
+    : `Not kept yet: when ${t.name || t.id} changes sketch this goes. Set keeps it for ${nm}.`;
 }
 function nudgeTo(x, y, z) {
   const t = TG(); if (!t) return;
   const c = v => Math.round(Math.max(-NMAX, Math.min(NMAX, v)) * 1000) / 1000;
   x = c(x); y = c(y); z = Math.round(Math.max(0.5, Math.min(2.5, z ?? offOf(t).z)) * 1000) / 1000;
-  NUDGE = { id: t.id, x, y, z, until: performance.now() + 2000 };
-  t.off_x = x; t.off_y = y; t.zoom = z;                   // the preview draws from this same layout object
+  const key = keyOf(t);
+  NUDGE = { id: t.id, key, x, y, z, until: performance.now() + 2000 };
+  t.off_x = x; t.off_y = y; t.zoom = z; t.off_for = key;  // the preview draws from this same layout object
   paintNudge();
   clearTimeout(nTimer);
   nTimer = setTimeout(async () => {
     const n = NUDGE; if (!n) return;
-    await setSurface(n.id, x2 => { x2.off_x = n.x; x2.off_y = n.y; x2.zoom = n.z; }, "Position");
+    await setSurface(n.id, x2 => { x2.off_x = n.x; x2.off_y = n.y; x2.zoom = n.z; x2.off_for = n.key; }, "Position");
     if (NUDGE === n) NUDGE.until = performance.now() + 800;
   }, 160);
 }
@@ -1264,6 +1285,23 @@ $("nudge").querySelectorAll("[data-d]").forEach(b => {
   b.onpointerup = b.onpointercancel = b.onlostpointercapture = stop;
 });
 $("nudgeC").onclick = () => nudgeTo(0, 0);
+// Set: keep the position for this sketch on this surface. Forget: drop it (back to centred).
+$("keepBtn").onclick = async () => {
+  const t = TG(); if (!t) return;
+  const o = offOf(t), key = keyOf(t), nm = keyName(t);
+  clearTimeout(nTimer);
+  if (await setSurface(t.id, x => { x.fit = Object.assign({}, x.fit, { [key]: [o.x, o.y, o.z] }); x.off_x = o.x; x.off_y = o.y; x.zoom = o.z; x.off_for = key; }, "Set"))
+    toast(`Kept: ${nm} on ${t.name || t.id}`);
+  NUDGE = null; paintNudge();
+};
+$("forgetBtn").onclick = async () => {
+  const t = TG(); if (!t) return;
+  const key = keyOf(t), nm = keyName(t);
+  clearTimeout(nTimer);
+  if (await setSurface(t.id, x => { const f = Object.assign({}, x.fit); delete f[key]; x.fit = f; x.off_x = 0; x.off_y = 0; x.zoom = 1; x.off_for = key; }, "Forget"))
+    toast(`${nm} is centred on ${t.name || t.id} again`);
+  NUDGE = null; paintNudge();
+};
 // Zoom: each tap is a step of the same size as the nudge's (Fine 0.75%, Normal 3%, Big 12%), around the surface's centre.
 const zoomBy = d => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x, o.y, o.z * Math.pow(1 + nStep * 1.5, d)); } };
 $("nudge").querySelectorAll("[data-z]").forEach(b => {
