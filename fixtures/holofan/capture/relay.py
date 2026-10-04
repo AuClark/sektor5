@@ -18,7 +18,7 @@ try: udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 except Exception: pass
 udp.bind(("0.0.0.0", h.UDP_PORT)); udp.setblocking(False)
 srv = socket.socket(); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); srv.bind(("0.0.0.0", h.TCP_PORT)); srv.listen(1); srv.setblocking(False)
-fan = app = None; phone = APP_HOST; app_said = False; next_try = 0; fanbuf = b""; last_ann = last_hb = 0; total = 0; last_data = time.time()
+fan = app = None; phone = APP_HOST; app_said = False; sent_fan = 0; next_try = 0; fanbuf = b""; last_ann = last_hb = 0; total = 0; last_data = time.time()
 say(f"relay on {me}: announcing until the fan connects")
 while time.time() - t0 < LIMIT:
     now = time.time()
@@ -56,7 +56,10 @@ while time.time() - t0 < LIMIT:
                 if APP and not app_said: say("the app closed straight away (not listening yet?): retrying"); next_try = now + 2; continue
                 say("app closed"); break
             rec(1, d); app_said = True; total += len(d); last_data = now
-            if fan: fan.sendall(d)
+            if fan:
+                try: fan.sendall(d)
+                except OSError as e: say(f"the fan dropped the connection ({e}) after {sent_fan + len(d)} bytes from the app"); fan = None; break
+                sent_fan += len(d)
     else:
         if fan is not None and app is None and phone and now >= next_try:
             try:
