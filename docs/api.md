@@ -77,6 +77,7 @@ From `showbrain`. `null` if the show engine isn't running.
 | `live` | The deck the lights are following. `follow` is 0 for auto, or a locked deck number. |
 | `live_reason` | Why that deck, e.g. `mixer: deck 2 holds 84% of the mix`, `locked in Commander`, `deck state (no mixer data)` |
 | `mixer_share` | Smoothed share of the mix per player (`{"1": 0.93, "2": 0.07}`), as used for the decision |
+| `music` | The mixer's melody analysis of the master mix, for the laser show, or `null` with no mixer: `note` (the lead note as MIDI, or `null` when no clear lead), `conf` (0-1), `chroma` (12 values 0-1, C to B: how much of each note is sounding), `bright` (0-1 spectral brightness), `onset_age` (seconds since the last synth onset), `level` |
 | `title`, `bpm`, `hue` (0-1, from the track's key) | Live deck's track, tempo and colour |
 | `bar`, `bwb` (beat in bar), `beat` (fractional), `frac` (0-1 phase within the beat) | Beat clock |
 | `section`, `section_progress` (0-1), `energy` (0-1 for this bar) | Where the live track is |

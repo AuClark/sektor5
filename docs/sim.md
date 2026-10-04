@@ -29,6 +29,7 @@ Press Ctrl-C to stop everything. Each service's log is in `brain/sim/logs/`. Edi
   - For each track it provides what the real deckdash would: a timeline with drops, sections, energy and a beat grid; overview and detailed waveforms; and library entries. Playlists are Warm up, Peak time and Trance.
   - **Auto-mix:** the next track starts on the outgoing track's outro, synced to its tempo. Its fader comes up over 8 bars, then the bass and tempo master swap. The old track fades out over 8 bars, and the next track is loaded behind it.
   - **Mixer:** channel levels, share, bass-out (in breakdowns and on the bass swap) and kicks all follow what's playing.
+  - **Melody:** each track has a generated lead line in its key (two 2-bar motifs: sparse in the intro, a riff in the groove, long notes in breakdowns, a rising arpeggio in builds, an octave up in drops), reported as the mixer's melody analysis would be (note, chroma, onsets), so the laser show has a melody to follow.
   - **Dashboard controls:** load, play (it starts on the other deck's next beat), stop, SYNC, MASTER and seek all work. With `--no-auto`, you run the set yourself.
 - **Not simulated:**
   - Light output: showbrain sends to 127.0.0.1, so nothing lights up. Use the Commander's fixture preview or the Stage view instead.
