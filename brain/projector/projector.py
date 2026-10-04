@@ -16,6 +16,8 @@
   /stage.html       3D stage visualiser and designer (three.js in web/vendor)
   /api/screen       POST from the output page: {"p","w","h"} (which projector, its real resolution)
                     plus stats {"fps","scale","gpu"} every few seconds, shown in the editor
+  /api/colour       POST from the first projector's output page: {"hue","sat"} (or {"hue": null}), the
+                    picture's main colour, passed on to showbrain (/api/visual_colour) for the Visuals palette
 
 Several projectors: the layout lists them ("projectors"); each surface and mask belongs to one. Each
 projector opens the output page with its id: /?p=left (no ?p = the first one).
@@ -49,6 +51,7 @@ WEB = HERE / "web"
 LAYOUTS = HERE / "layouts"
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8100
 SHOWBRAIN = "http://127.0.0.1:8090/api/state"
+SHOWBRAIN_COLOUR = "http://127.0.0.1:8090/api/visual_colour"
 STATE_HZ = 25
 
 DEFAULT_LAYOUT = {
@@ -97,6 +100,19 @@ def coord(v):
     return max(-0.5, min(1.5, float(v)))     # a little overscan allowed for alignment
 
 
+def clean_fit(f):
+    """Positions kept per sketch on a surface (Set in the editor or Focus): {name: [x, y, zoom]}."""
+    out = {}
+    if isinstance(f, dict):
+        for k, v in list(f.items())[:64]:
+            try:
+                if isinstance(k, str) and SAFE_NAME.match(k) and isinstance(v, (list, tuple)) and len(v) == 3:
+                    out[k] = [max(-1.0, min(1.0, float(v[0]))), max(-1.0, min(1.0, float(v[1]))), max(0.25, min(4.0, float(v[2])))]
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
 def clean_layout(d):
     """Validate and normalise a layout coming from the editor."""
     out = json.loads(json.dumps(DEFAULT_LAYOUT))
@@ -120,7 +136,7 @@ def clean_layout(d):
     surfaces = []
     for s in d.get("surfaces", [])[:32]:
         c = s.get("corners", [])
-        if len(c) not in (3, 4):          # a quad, or a triangle (apex, base right, base left)
+        if len(c) not in (3, 4):          # a quad (or a diamond), or a triangle (apex, base right, base left)
             continue
         surfaces.append({
             "id": str(s.get("id") or f"s{len(surfaces) + 1}")[:24],
@@ -129,11 +145,17 @@ def clean_layout(d):
             "opacity": float(max(0.0, min(1.0, s.get("opacity", 1.0)))),
             "hue_shift": float(max(-1.0, min(1.0, s.get("hue_shift", 0.0)))),
             "radius": float(max(0.0, min(0.5, s.get("radius", 0.0)))),              # corner radius, surface heights
+            "off_x": float(max(-1.0, min(1.0, s.get("off_x", 0.0) or 0.0))),         # the picture's position in the surface:
+            "off_y": float(max(-1.0, min(1.0, s.get("off_y", 0.0) or 0.0))),         # + right / down, in surface widths / heights
+            "zoom": float(max(0.25, min(4.0, s.get("zoom", 1.0) or 1.0))),            # the picture's size in it (1 = as made)
+            "off_for": name_or_none(s.get("off_for")),   # the sketch (or content) that position is being set on
+            "fit": clean_fit(s.get("fit")),              # positions kept per sketch: {name: [x, y, zoom]}
             "border": float(max(0.0, min(0.15, s.get("border", 0.0)))),             # border band width
             "border_bright": float(max(0.0, min(2.0, s.get("border_bright", 1.0)))),
             "border_sat": float(max(0.0, min(1.0, s.get("border_sat", 0.0)))),      # 0 white .. 1 show colour
             "border_pulse": float(max(0.0, min(1.0, s.get("border_pulse", 0.0)))),  # beat flash on the border
             "corners": [[coord(x), coord(y)] for x, y in c],
+            "shape": "diamond" if s.get("shape") == "diamond" and len(c) == 4 else None,   # 4 corners: top, right, bottom, left
             "projector": owner(s),
             "sketch": name_or_none(s.get("sketch")),     # gen: its own sketch (None = the live one)
             "preset": name_or_none(s.get("preset")),     # gen: a preset of that sketch
@@ -374,7 +396,7 @@ class H(Gz, SimpleHTTPRequestHandler):
 
     def do_POST(self):
         global layout, screen, screens
-        if s5auth.handle(self) or not s5auth.guard(self, allow=("/api/screen",)):
+        if s5auth.handle(self) or not s5auth.guard(self, allow=("/api/screen", "/api/colour")):
             return
         path = self.path.split("?", 1)[0]
         try:
@@ -410,6 +432,17 @@ class H(Gz, SimpleHTTPRequestHandler):
                 LAYOUTS.mkdir(exist_ok=True)
                 f.write_bytes(data)
                 broadcast({"t": "backdrop", "p": f.stem.removeprefix("backdrop-"), "at": int(time.time())})
+                return self._json(200, {"ok": True})
+            if path == "/api/colour":
+                d = self._body()
+                hue = d.get("hue")
+                body = {"hue": None} if hue is None else {"hue": float(hue) % 1.0, "sat": max(0.0, min(1.0, float(d.get("sat", 1.0))))}
+                req = urllib.request.Request(SHOWBRAIN_COLOUR, data=json.dumps(body).encode(), method="POST",
+                                             headers={"Content-Type": "application/json"})
+                try:
+                    urllib.request.urlopen(req, timeout=0.3).close()
+                except Exception:
+                    return self._json(502, {"error": "showbrain not reachable"})
                 return self._json(200, {"ok": True})
             if path == "/api/screen":
                 d = self._body()

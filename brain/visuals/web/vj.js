@@ -153,7 +153,7 @@ const VJ = (() => {
 
   // The track's waveform, for whoever is running the visuals: what the audio is doing and what's
   // coming. It's a monitor, not part of the picture, so it sits in its own panel under the preview
-  // (never over it) and says so. On or off by one setting shared by every page that has it (Live
+  // (never over it) and says so. On or off by one setting shared by every page that has it (Focus
   // and the Visuals page). The track scrolls past a playhead a third of the way in, bars marked,
   // bass in orange, what's been played dimmed. It reads the same per-beat waveform the sketches do
   // (MapRenderer.wave), on the same beat clock. Zoom: scroll wheel, pinch, or the − / + buttons,

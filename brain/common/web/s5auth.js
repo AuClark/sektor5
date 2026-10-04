@@ -93,7 +93,7 @@
   // shift when it swaps in. Offline, fall back to the system font after a moment.
 
   // Appearance: dark (default), light, or match the device. One setting for the whole app, the same
-  // one Live (/show.html) uses, remembered per browser.
+  // one Focus (/show.html) uses, remembered per browser.
   const MODES = ["dark", "light", "auto"];
   const mode = () => { const m = localStorage.getItem("s5theme"); return MODES.includes(m) ? m : "dark"; };
   function applyMode() {
@@ -128,7 +128,7 @@
   // The theme: one design system over every page's own styles (see docs/design.md). Last in <head>,
   // so it wins over the page's blocks; moved there again once the page has parsed, in case a page
   // adds styles after this script.
-  // A page with a design system of its own (Live, /show.html) opts out with <html data-s5-own-theme>;
+  // A page with a design system of its own (Focus, /show.html) opts out with <html data-s5-own-theme>;
   // it still gets the shared components (the fader).
   const theme = document.createElement("style");
   theme.id = "s5theme";
@@ -138,7 +138,7 @@
   let quietUntil = 0, pending = null;
 
   function faderCss() { return `
-  /* The intensity fader (VJ.fader, on the Visuals page, the Launchpad and Live). */
+  /* The intensity fader (VJ.fader, on the Visuals page, the Launchpad and Focus). */
   .s5fader { position: relative; height: 48px; border-radius: 12px; overflow: hidden; background: var(--well, var(--card, #08080a)); border: 1px solid var(--line, var(--border, #26262b));
     touch-action: none; cursor: ew-resize; user-select: none; -webkit-user-select: none; }
   .s5fader .f { position: absolute; inset: 0 auto 0 0; width: 50%;
@@ -233,7 +233,7 @@
   /* Light mode (the sun / moon in the top bar). Every grey in the pages is a --nRRGGBB variable
      (dark by default); here they're mirrored onto a light zinc scale, roles kept: page, panels,
      hover, lines, outlines, faint, dim, text. The displays (previews, waveforms, the stage, the
-     fixture strips) are canvases and stay dark, like Live's pictures: they're what the room sees. */
+     fixture strips) are canvases and stay dark, like Focus's pictures: they're what the room sees. */
   html[data-theme=light]:root:root { ${lightVars()} --inv: 0,0,0;
     --bg: #f4f4f5; --panel: #ffffff; --card: #ffffff; --well: #fafafb; --line: #e4e4e7; --line2: #d4d4d8;
     --text: #09090b; --dim: #52525b; --faint: #a1a1aa; --hover: #f0f0f2; --good: #16a34a; --warn: #b45309; --bad: #dc2626; color-scheme: light; }
@@ -319,10 +319,11 @@
     Projection: '<rect x="2" y="8" width="20" height="10" rx="2"/><circle cx="8" cy="13" r="3"/><path d="M14 11h5M14 14h3M6 18v2M18 18v2"/>',
     Visuals: '<path d="M2 12c2.5-6 4.5-6 6.5 0s4.5 6 7 0 4-6 6.5 0"/><path d="M2 17c2.5-3 4.5-3 6.5 0s4.5 3 7 0 4-3 6.5 0" opacity=".5"/>',
     Stage: '<path d="M3 4h18M7 4v3M17 4v3"/><path d="M7 7 4 20M7 7l4 13M17 7l-4 13M17 7l3 13" opacity=".6"/><path d="M3 20h18"/>',
-    Live: '<circle cx="12" cy="12" r="3"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/>',
+    Focus: '<circle cx="12" cy="12" r="3"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/>',
   };
-  // The app has two modes: these full pages (setup and detail) and Live (/show.html on the visuals
-  // service), the phone-first remote for running the night. Every page's top bar links to Live.
+  // The app has two modes: these full pages (setup and detail) and Focus (/show.html on the visuals
+  // service), the simple view for running the night. Every page's top bar links to Focus. (It was
+  // called Live, which clashed with the Sim / Live switch: Live there means the real decks.)
   const LIVE = [8110, "/show.html"];
   // Section tabs: one tab per section of a page's controls, in `mount` (under the display); only the
   // chosen section shows. Follows sections that come and go (e.g. a sketch's groups), and remembers
@@ -362,15 +363,15 @@
     if (!top || document.querySelector(".s5tabs")) return;
     const here = (top.querySelector("a.here") || {}).textContent;
     const nav = el("nav", { class: "s5tabs", "aria-label": "Pages" });
-    // The same order as Live's tab bar (Decks · Lights · Visuals · Mapping · Stage), then Live.
-    nav.innerHTML = [["Decks", 8080, "/"], ["Lighting", 8090, "/"], ["Visuals", 8110, "/"], ["Projection", 8100, "/edit"], ["Stage", 8100, "/stage.html"], ["Live", ...LIVE]]
+    // The same order as Focus's tab bar (Decks · Lights · Visuals · Mapping · Stage), then Focus.
+    nav.innerHTML = [["Decks", 8080, "/"], ["Lighting", 8090, "/"], ["Visuals", 8110, "/"], ["Projection", 8100, "/edit"], ["Stage", 8100, "/stage.html"], ["Focus", ...LIVE]]
       .map(([n, port, path]) => `<a data-port="${port}" data-path="${path}" class="${n === here ? "here" : ""}">${svg(n)}<span>${n}</span></a>`).join("");
     document.body.appendChild(nav);
   }
   function liveLink() {
     const top = document.querySelector(".s5bar nav.pages");
     if (!top || top.querySelector(".s5live")) return;
-    top.appendChild(el("a", { class: "s5live", "data-port": LIVE[0], "data-path": LIVE[1], title: "Live: the remote for running the night" }, "<i></i>Live"));
+    top.appendChild(el("a", { class: "s5live", "data-port": LIVE[0], "data-path": LIVE[1], title: "Focus: the simple view for running the night" }, "<i></i>Focus"));
   }
   function links() {
     liveLink();

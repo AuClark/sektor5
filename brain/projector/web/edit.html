@@ -35,6 +35,11 @@
   .list div { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
   .list div.sel { background: #1d2b36; outline: 1px solid var(--cyan); }
   .list div.selm { background: #2b1d33; outline: 1px solid var(--pink); }
+  /* Surfaces: one row each, its name and what it shows, so the whole projector reads at a glance */
+  #surfaces div { gap: 6px; }
+  #surfaces .nm { flex: 0 0 30%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #surfaces select { flex: 1 1 0; min-width: 0; padding: 5px 6px; }
+  #surfaces select.pre { flex: 0 1 34%; }
   .hint { color: var(--dim); font-size: 12px; }
 
   /* ------------------------------------------------------------------ design system
@@ -147,25 +152,13 @@
   <section class="panel tabbed">
     <div class="card">
       <h3>Surfaces</h3>
+      <p class="hint" style="margin:0 0 6px">What each one shows. <b>Focus</b> is the look the Visuals page (and Shuffle) is playing; pick a sketch to give a surface its own.</p>
       <div class="list" id="surfaces"></div>
-      <div class="row" style="margin-top:8px"><button id="bAdd">+ Surface</button><button id="bAddTri" title="A triangle: three corners (apex, base right, base left), e.g. a face of a pyramid">+ Triangle</button><button id="bDup">Duplicate</button><button id="bDel" class="warn">Delete</button></div>
+      <div class="row" style="margin-top:8px"><button id="bAdd">+ Surface</button><button id="bAddTri" title="A triangle: three corners (apex, base right, base left), e.g. a face of a pyramid">+ Triangle</button><button id="bAddDia" title="A diamond: four corners (top, right, bottom, left). The picture stays upright and centred, cropped to the diamond">+ Diamond</button><button id="bDup">Duplicate</button><button id="bDel" class="warn">Delete</button></div>
     </div>
     <div class="card" id="props">
       <h3>Selected surface</h3>
       <div class="row"><input id="pName" class="grow" placeholder="Name"></div>
-      <div class="row"><label>Content</label>
-        <select id="pContent" class="grow">
-          <option value="show">show — follows the scene engine</option>
-          <option value="pulse">pulse — beat flash</option>
-          <option value="tunnel">tunnel</option>
-          <option value="bars">bars</option>
-          <option value="title">title — track name</option>
-          <option value="solid">solid colour</option>
-          <option value="test">test grid</option>
-          <option value="gen">generative sketch</option>
-        </select></div>
-      <div class="row" id="genSketchRow"><label>Sketch</label><select id="pSketch" class="grow" title="Live follows the Visuals page; or pick one for this surface"></select></div>
-      <div class="row" id="genPresetRow"><label>Preset</label><select id="pPreset" class="grow"></select></div>
       <label>Opacity <span id="vOp"></span></label><input id="pOp" type="range" min="0" max="1" step="0.05">
       <label>Hue shift <span id="vHue"></span></label><input id="pHue" type="range" min="-0.5" max="0.5" step="0.01">
       <label>Corner radius <span id="vRad"></span></label><input id="pRad" type="range" min="0" max="0.5" step="0.005">
@@ -173,7 +166,10 @@
       <label>Border brightness <span id="vBb"></span></label><input id="pBb" type="range" min="0" max="2" step="0.05">
       <label>Border colour <span id="vBs"></span></label><input id="pBs" type="range" min="0" max="1" step="0.05">
       <label>Border beat pulse <span id="vBp"></span></label><input id="pBp" type="range" min="0" max="1" step="0.05">
-      <div class="row" style="margin-top:6px"><button id="bFill">Fill screen</button><button id="bReset">Reset corners</button><button id="bSel">Next corner ↻</button></div>
+      <label title="Shift the picture inside the surface without moving its corners">Picture across <span id="vOx"></span></label><input id="pOx" type="range" min="-0.5" max="0.5" step="0.005">
+      <label>Picture up / down <span id="vOy"></span></label><input id="pOy" type="range" min="-0.5" max="0.5" step="0.005">
+      <label title="How big the picture is inside the surface (its corners stay put)">Picture zoom <span id="vZm"></span></label><input id="pZm" type="range" min="0.5" max="2.5" step="0.01">
+      <div class="row" style="margin-top:6px"><button id="bFill">Fill screen</button><button id="bCentre" title="Put the picture back in the middle of the surface, at 100%">Reset picture</button><button id="bKeep" title="Keep this position and zoom for the sketch on this surface; other sketches keep their own">Keep</button><button id="bForget" title="Drop the kept position for this sketch">Forget</button><button id="bReset">Reset corners</button><button id="bSel">Next corner ↻</button></div>
     </div>
     <div class="card">
       <h3>Masks</h3>
@@ -346,6 +342,12 @@ $("bAddTri").onclick = () => {
                     corners: [[0.5 + o, 0.3 + o], [0.7 + o, 0.7 + o], [0.3 + o, 0.7 + o]] });
   L.selected = id; push(true); ui();
 };
+$("bAddDia").onclick = () => {
+  const id = newId("s", L.surfaces), o = 0.04 * (L.surfaces.length % 5);
+  L.surfaces.push({ id, name: `Diamond ${L.surfaces.filter(s => s.shape === "diamond").length + 1}`, content: "show", opacity: 1, hue_shift: 0, projector: curId(),
+                    shape: "diamond", corners: [[0.5 + o, 0.25 + o], [0.7 + o, 0.5 + o], [0.5 + o, 0.75 + o], [0.3 + o, 0.5 + o]] });
+  L.selected = id; push(true); ui();
+};
 $("bDup").onclick = () => {
   const s = sel(); if (!s) return;
   const id = newId("s", L.surfaces);
@@ -353,17 +355,44 @@ $("bDup").onclick = () => {
   L.selected = id; push(true); ui();
 };
 $("bDel").onclick = () => { const s = sel(); if (!s) return; L.surfaces = L.surfaces.filter(x => x !== s); L.selected = null; push(true); ui(); };
-const tri = s => s.corners.length === 3;
-$("bFill").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0], [1, 1], [0, 1]] : [[0, 0], [1, 0], [1, 1], [0, 1]]; push(true); } };
-$("bReset").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0.25], [0.75, 0.75], [0.25, 0.75]] : [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]]; push(true); } };
+const tri = s => s.corners.length === 3, dia = s => s.shape === "diamond";
+$("bFill").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0], [1, 1], [0, 1]] : dia(s) ? [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]] : [[0, 0], [1, 0], [1, 1], [0, 1]]; push(true); } };
+$("bReset").onclick = () => { const s = sel(); if (s) { s.corners = tri(s) ? [[0.5, 0.25], [0.75, 0.75], [0.25, 0.75]] : dia(s) ? [[0.5, 0.25], [0.75, 0.5], [0.5, 0.75], [0.25, 0.5]] : [[0.25, 0.25], [0.75, 0.25], [0.75, 0.75], [0.25, 0.75]]; push(true); } };
 $("bSel").onclick = () => { const s = sel(); selCorner = (selCorner + 1) % (s ? s.corners.length : 4); };
 $("pName").oninput = e => { const s = sel(); if (s) { s.name = e.target.value; push(); renderLists(); } };
-$("pContent").onchange = e => { const s = sel(); if (s) { s.content = e.target.value; push(true); renderLists(); ui(); } };
-// Generative surfaces: the live sketch (the Visuals page's) or one of their own, and a preset of it.
+// What a surface shows, from one picker: Focus (the look the Visuals page is playing), a sketch of
+// its own (by theme, then a preset of it), or one of the built-in contents at the bottom.
 const VIS = window.S5AUTH && S5AUTH.url ? S5AUTH.url(8110, "") : `${location.protocol}//${location.hostname}:8110`;
-let sketchNames = [], presetsFor = {};
+let sketchNames = [], sketchThemes = [], sketchTitles = {}, presetsFor = {};
+const BUILT_IN = [["show", "Lights' colours (follows the show)"], ["pulse", "Beat flash"], ["tunnel", "Tunnel"], ["bars", "Bars"],
+                  ["title", "Track name"], ["solid", "Solid colour"], ["test", "Test grid"]];
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const pickOf = s => s.content !== "gen" ? s.content : s.sketch ? "sk:" + s.sketch : "focus";
+const titleOf = n => sketchTitles[n] || n;
+function pickerHTML(s) {
+  const v = pickOf(s), o = (val, label) => `<option value="${esc(val)}"${val === v ? " selected" : ""}>${esc(label)}</option>`;
+  const groups = sketchThemes.length ? sketchThemes : (sketchNames.length ? [{ name: "Sketches", sketches: sketchNames }] : []);
+  const listed = new Set(groups.flatMap(g => g.sketches));
+  let h = o("focus", "Focus · what the Visuals page plays");
+  if (s.content === "gen" && s.sketch && !listed.has(s.sketch)) h += o("sk:" + s.sketch, s.sketch + " (missing)");
+  for (const g of groups) h += `<optgroup label="${esc(g.name)}">` + g.sketches.map(n => o("sk:" + n, titleOf(n))).join("") + "</optgroup>";
+  return h + `<optgroup label="Built in">` + BUILT_IN.map(([k, l]) => o(k, l)).join("") + "</optgroup>";
+}
+function presetHTML(s) {
+  const o = (val, label) => `<option value="${esc(val)}"${val === (s.preset || "") ? " selected" : ""}>${esc(label)}</option>`;
+  return o("", "As last left") + (presetsFor[s.sketch] || []).map(n => o(n, n)).join("");
+}
+function setPick(s, v) {
+  if (v === "focus") Object.assign(s, { content: "gen", sketch: null, preset: null });
+  else if (v.startsWith("sk:")) Object.assign(s, { content: "gen", sketch: v.slice(3), preset: null });
+  else Object.assign(s, { content: v, sketch: null, preset: null });
+  push(true); ui();
+}
 async function loadSketchNames() {
-  try { sketchNames = (await (await fetch(VIS + "/api/sketches")).json()).sketches; } catch (e) { sketchNames = []; }
+  try {
+    const r = await (await fetch(VIS + "/api/sketches")).json();
+    sketchNames = r.sketches || []; sketchThemes = r.themes || []; sketchTitles = r.titles || {};
+  } catch (e) { sketchNames = []; }
   ui();
 }
 async function loadPresets(name) {
@@ -373,8 +402,6 @@ async function loadPresets(name) {
   ui();
 }
 loadSketchNames();
-$("pSketch").onchange = e => { const s = sel(); if (s) { s.sketch = e.target.value || null; s.preset = null; push(true); renderLists(); ui(); } };
-$("pPreset").onchange = e => { const s = sel(); if (s) { s.preset = e.target.value || null; push(true); renderLists(); } };
 // Projectors
 function projName(id) { const p = (L.projectors || []).find(p => p.id === id); return p ? p.name : id; }
 $("pProj").onchange = e => { cur = e.target.value; localStorage.setItem("s5proj", cur); L.selected = null; sizeStage(); ui(); };
@@ -404,10 +431,31 @@ $("pHue").oninput = e => { const s = sel(); if (s) { s.hue_shift = +e.target.val
 const SHAPE = [["pRad", "radius", 0, v => v.toFixed(3)], ["pBw", "border", 0, v => v.toFixed(3)],
                ["pBb", "border_bright", 1, v => Math.round(v * 100) + "%"],
                ["pBs", "border_sat", 0, v => v < 0.05 ? "white" : v > 0.95 ? "show colour" : Math.round(v * 100) + "% colour"],
-               ["pBp", "border_pulse", 0, v => Math.round(v * 100) + "%"]];
+               ["pBp", "border_pulse", 0, v => Math.round(v * 100) + "%"],
+               ["pOx", "off_x", 0, v => Math.abs(v) < 0.0025 ? "centred" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? "right" : "left"}`],
+               ["pOy", "off_y", 0, v => Math.abs(v) < 0.0025 ? "centred" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? "down" : "up"}`],
+               ["pZm", "zoom", 1, v => Math.round(v * 100) + "%"]];
 const shapeLabel = (sl, v) => { const d = SHAPE.find(x => x[0] === sl); $("v" + sl.slice(1)).textContent = d[3](v); };
+// The picture's position and zoom belong to the sketch on the surface now (render.js fitOf): moving one
+// starts from where that sketch sits, and marks the draft as this sketch's.
+const FIT = { pOx: 0, pOy: 1, pZm: 2 };
+const fkey = s => fitKey(s, R.liveSketch);
 for (const [sl, key] of SHAPE)
-  $(sl).oninput = e => { const s = sel(); if (s) { s[key] = +e.target.value; shapeLabel(sl, s[key]); push(); } };
+  $(sl).oninput = e => { const s = sel(); if (!s) return;
+    if (sl in FIT) { const f = fitOf(s, fkey(s)); [s.off_x, s.off_y, s.zoom] = f; s.off_for = fkey(s); }
+    s[key] = +e.target.value; shapeLabel(sl, s[key]); paintKeep(); push(); };
+function paintKeep() {
+  const s = sel(); if (!s) return;
+  const k = fkey(s), f = fitOf(s, k), kept = (s.fit || {})[k], nm = k || "this sketch";
+  const same = kept ? f.every((v, i) => Math.abs(v - kept[i]) < 1e-4) : Math.abs(f[0]) < 1e-4 && Math.abs(f[1]) < 1e-4 && Math.abs(f[2] - 1) < 1e-4;
+  $("bKeep").textContent = same && kept ? `Kept for ${nm} ✓` : `Keep for ${nm}`;
+  $("bKeep").classList.toggle("on", !same);
+  $("bForget").style.display = kept ? "" : "none";
+}
+$("bCentre").onclick = () => { const s = sel(); if (s) { s.off_x = 0; s.off_y = 0; s.zoom = 1; s.off_for = fkey(s); push(true); ui(); } };
+$("bKeep").onclick = () => { const s = sel(); if (!s) return; const k = fkey(s); s.fit = Object.assign({}, s.fit, { [k]: fitOf(s, k) }); push(true); ui(); };
+$("bForget").onclick = () => { const s = sel(); if (!s) return; const k = fkey(s), f = Object.assign({}, s.fit); delete f[k]; s.fit = f;
+  s.off_x = 0; s.off_y = 0; s.zoom = 1; s.off_for = k; push(true); ui(); };
 $("pLead").oninput = e => { L.lead_ms = +e.target.value; $("vLead").textContent = L.lead_ms; push(); };
 $("pRs").onchange = e => { L.render_scale = +e.target.value; push(true); };
 $("pBr").oninput = e => { L.brightness = +e.target.value; $("vBr").textContent = Math.round(L.brightness * 100) + "%"; push(); };
@@ -436,9 +484,32 @@ refreshPresets();
 
 // ---------- UI refresh
 function renderLists() {
-  $("surfaces").innerHTML = L.surfaces.filter(mine).map(s => `<div data-id="${s.id}" class="${s.id === L.selected ? "sel" : ""}"><span>${s.name || s.id}</span><span class="hint">${s.content === "gen" ? (s.sketch ? s.sketch + (s.preset ? " · " + s.preset : "") : "gen · live") : s.content}</span></div>`).join("") || "<p class='hint'>No surfaces on this projector yet.</p>";
+  const box = $("surfaces"), mineS = L.surfaces.filter(mine);
+  // A picker is open (or has focus): don't rebuild it from under the finger, just move the highlight.
+  if (box.contains(document.activeElement) && document.activeElement.tagName === "SELECT") {
+    box.querySelectorAll("div[data-id]").forEach(el => el.classList.toggle("sel", el.dataset.id === L.selected));
+  } else {
+    for (const s of mineS) if (s.content === "gen" && s.sketch) loadPresets(s.sketch);
+    box.innerHTML = mineS.map(s => `<div data-id="${esc(s.id)}" class="${s.id === L.selected ? "sel" : ""}"><span class="nm" title="${esc(s.name || s.id)}">${esc(s.name || s.id)}</span>` +
+      `<select class="pick" title="What this surface shows">${pickerHTML(s)}</select>` +
+      (s.content === "gen" && s.sketch ? `<select class="pre" title="Which of its presets">${presetHTML(s)}</select>` : "") + `</div>`).join("")
+      || "<p class='hint'>No surfaces on this projector yet.</p>";
+    // Find the surface when the picker changes, not now: the projector echoes every change back as a
+    // new layout (onLayout replaces L), and a surface held from before would be edited in a stale copy.
+    box.querySelectorAll("div[data-id]").forEach(el => {
+      const id = el.dataset.id, surf = () => L.surfaces.find(x => x.id === id);
+      el.querySelector(".pick").onchange = e => { const s = surf(); if (!s) return; L.selected = id; setPick(s, e.target.value); };
+      const pre = el.querySelector(".pre");
+      if (pre) pre.onchange = e => { const s = surf(); if (!s) return; L.selected = id; s.preset = e.target.value || null; push(true); ui(); };
+    });
+  }
   $("masks").innerHTML = L.masks.filter(mine).map(m => `<div data-id="${m.id}" class="${m.id === L.selected ? "selm" : ""}"><span>${m.id}</span><span class="hint">${m.points.length} points</span></div>`).join("") || "<p class='hint'>No masks.</p>";
-  document.querySelectorAll(".list div[data-id]").forEach(el => el.onclick = () => { L.selected = el.dataset.id; push(true); ui(); });
+  document.querySelectorAll(".list div[data-id]").forEach(el => el.onclick = e => {
+    if (L.selected === el.dataset.id) return;
+    L.selected = el.dataset.id; push(true);
+    if (e.target.tagName === "SELECT") document.querySelectorAll(".list div[data-id]").forEach(d => d.classList.toggle("sel", d.dataset.id === L.selected));
+    else ui();
+  });
 }
 function ui() {
   if (!L) return;
@@ -453,20 +524,11 @@ function ui() {
   $("props").style.opacity = s ? 1 : 0.4;
   if (s) {
     if (document.activeElement !== $("pName")) $("pName").value = s.name || "";
-    $("pContent").value = s.content; $("pOp").value = s.opacity; $("pHue").value = s.hue_shift || 0;
-    const gen = s.content === "gen";
-    $("genSketchRow").style.display = gen ? "" : "none";
-    $("genPresetRow").style.display = gen && s.sketch ? "" : "none";
-    if (gen) {
-      const names = sketchNames.includes(s.sketch) || !s.sketch ? sketchNames : [s.sketch, ...sketchNames];
-      $("pSketch").innerHTML = `<option value="">Live (follows the Visuals page)</option>` + names.map(n => `<option${n === s.sketch ? " selected" : ""}>${n}</option>`).join("");
-      if (s.sketch) {
-        loadPresets(s.sketch);
-        $("pPreset").innerHTML = `<option value="">As last set on the Visuals page</option>` + (presetsFor[s.sketch] || []).map(n => `<option${n === s.preset ? " selected" : ""}>${n}</option>`).join("");
-      }
-    }
+    $("pOp").value = s.opacity; $("pHue").value = s.hue_shift || 0;
     $("vOp").textContent = Math.round(s.opacity * 100) + "%"; $("vHue").textContent = (s.hue_shift || 0).toFixed(2);
-    for (const [sl, key, dflt] of SHAPE) { const v = s[key] ?? dflt; $(sl).value = v; shapeLabel(sl, v); }
+    const fit = fitOf(s, fkey(s));
+    for (const [sl, key, dflt] of SHAPE) { const v = sl in FIT ? fit[FIT[sl]] : s[key] ?? dflt; $(sl).value = v; shapeLabel(sl, v); }
+    paintKeep();
   }
   $("pLead").value = L.lead_ms; $("vLead").textContent = L.lead_ms;
   $("pRs").value = String(L.render_scale || 0);

@@ -2,11 +2,11 @@
   "_about": "Which theme each sketch belongs to, in the order the Visuals page shows them. Shuffle draws from one theme (or all of them). A sketch listed here that doesn't exist is skipped; a sketch that isn't listed shows under Other.",
   "themes": [
     {"id": "sacred",  "name": "Sacred",  "blurb": "Gold, geometry and temples",
-     "sketches": ["sacred", "geometry", "throne", "gilt", "phyllotaxis", "eye", "ascend", "cathedral"]},
+     "sketches": ["sacred", "geometry", "throne", "gilt", "phyllotaxis", "eye", "illuminati", "ascend", "cathedral"]},
     {"id": "cosmic",  "name": "Cosmic",  "blurb": "Space, light and falling through it",
      "sketches": ["horizon", "eclipse", "wormhole", "vertigo", "diamond", "orb"]},
     {"id": "tales",   "name": "Tales",   "blurb": "Characters and stories",
-     "sketches": ["inkwell", "sisyphus", "hypnotoad", "mouths", "labyrinth", "milking", "atlantis"]},
+     "sketches": ["inkwell", "sisyphus", "hypnotoad", "mouths", "labyrinth", "milking", "atlantis", "dragons"]},
     {"id": "signals", "name": "Signals", "blurb": "Secrets, surveillance and the unexplained",
      "sketches": ["area51", "cctv", "cipher", "redacted", "subliminal"]},
     {"id": "organic", "name": "Organic", "blurb": "Living patterns that grow",

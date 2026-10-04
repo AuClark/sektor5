@@ -125,6 +125,8 @@
   .seg button { height: var(--h); border-radius: 9px; font-weight: 500; font-size: 14px; color: var(--dim); transition: background .12s, color .12s; }
   .seg button:hover { color: var(--text); background: var(--muted); }
   .seg button.on { background: var(--text); color: var(--on); }
+  #plays { grid-auto-flow: row; grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  @media (max-width: 760px) { #plays { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
   /* ---------------------------------------------------------------- level: the whole bar is the slider */
   .level { position: relative; height: 56px; border-radius: var(--r); overflow: hidden; background: var(--card); border: 1px solid var(--border);
@@ -206,6 +208,44 @@
   .words input:focus { border-color: var(--border2); box-shadow: 0 0 0 3px var(--accent-soft); }
   .hint2 { margin: 6px 2px 0; font-size: 12px; color: var(--faint); }
   .under { margin-top: 10px; }
+  /* Projection: what the controls play with, under the picture: the Focus look, or one surface */
+  .targets { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 10px; }
+  .targets:empty { display: none; }
+  .tchip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 104px; max-width: 200px; padding: 7px 12px;
+           border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text); text-align: left; }
+  .tchip b { font-size: 13px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tchip small { font-size: 11px; color: var(--dim); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tchip:hover { background: var(--card2); }
+  .tchip.on { background: var(--text); border-color: var(--text); color: var(--on); } .tchip.on small { color: inherit; opacity: .65; }
+  .targets select { flex: none; height: auto; border-radius: 10px; background: var(--card); color: var(--text); border: 1px solid var(--border); font: 500 13px var(--font); padding: 0 8px; }
+  .looklist .tofocus { grid-column: 1 / -1; }
+  /* Position: nudge the picture inside the picked surface */
+  .nudge { margin-bottom: 14px; }
+  .nudgebox { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: stretch; margin: 8px 0; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 4px; }
+  .dpad button { display: grid; place-items: center; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text); touch-action: none; }
+  .dpad button svg { width: 18px; height: 18px; }
+  .dpad button:active, .dpad button.held { background: var(--text); color: var(--on); }
+  .dpad .mid { font-size: 10px; font-weight: 600; color: var(--dim); }
+  .keep { display: flex; gap: 6px; margin-top: 8px; }
+  .keepbtn { flex: 1; height: 40px; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text); font: 600 14px var(--font); }
+  .keepbtn.attn { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .keepbtn.done { color: var(--dim); }
+  .keepst { font-size: 12px; color: var(--dim); margin-top: 5px; }
+  .zoomrow { display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 4px; margin-bottom: 8px; }
+  .zoomrow button { height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--card); border: 1px solid var(--border); color: var(--text);
+                    font: 600 13px var(--font); font-variant-numeric: tabular-nums; touch-action: none; }
+  .zoomrow button svg { width: 16px; height: 16px; }
+  .zoomrow button:active, .zoomrow button.held { background: var(--text); color: var(--on); }
+  .xy { position: relative; border-radius: 10px; background: var(--card); border: 1px solid var(--border); touch-action: none; cursor: grab; min-height: 128px; overflow: hidden; }
+  .xy .cx, .xy .cy { position: absolute; background: var(--border2); } .xy .cx { left: 50%; top: 0; bottom: 0; width: 1px; } .xy .cy { top: 50%; left: 0; right: 0; height: 1px; }
+  .xy b { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 4px var(--accent-soft); left: 50%; top: 50%; }
+  .label em.for { white-space: nowrap; font-style: normal; font-weight: 600; color: var(--text); background: var(--muted); border-radius: 6px; padding: 1px 7px; margin-left: 6px; }
+  .label em.for:empty { display: none; }
+  /* A surface on its own sketch is picked: what only plays the Focus look steps back, and says so */
+  body.own .fo { opacity: .35; pointer-events: none; }
+  .fonote { font-size: 12px; color: var(--dim); background: var(--card); border: 1px dashed var(--border2); border-radius: 10px; padding: 8px 10px; margin: 4px 0 10px; }
+  #pv canvas#ov { cursor: pointer; }
   /* More: the segment is the dropdown itself (an invisible native select over it), so one tap opens the phone's picker */
   .trans .morebtn { position: relative; }
   .trans .morebtn select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
@@ -250,24 +290,24 @@
     :root { --chrome: 160px; }
     main { max-width: 1480px; padding-bottom: 96px; }
     .screen:not(.stage) { max-width: 960px; margin: 0 auto; }
-    .stagegrid { display: grid; gap: 20px; height: calc(100vh - var(--chrome)); align-items: stretch; }
+    .stagegrid { display: grid; gap: 20px; height: calc(100vh - var(--chrome) - var(--top, 0px)); align-items: stretch; }
     .stagegrid.vis { grid-template-columns: 280px minmax(0, 1fr) 280px; }
     .stagegrid .side { display: block; order: 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; padding: 2px 6px 16px 2px; }
     .stagegrid .centre { order: 0; min-height: 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
     .stagegrid .label { line-height: 16px; min-height: 16px; }
     .stagegrid .label.first { margin-top: 4px; }
-    .stagegrid .centre { justify-content: flex-start !important; padding-top: 30px; }
+    .stagegrid .centre { justify-content: flex-start !important; padding-top: 4px; }
     .stagegrid .side .presets { padding: 0; }
     .side .g3 { grid-template-columns: 1fr; } .side .g3 .tile { min-height: 84px; font-size: 18px; }
     .side .presets { flex-direction: column; overflow: visible; margin: 0; gap: 6px; }
     .side .presets .tile { flex: none; min-height: 44px; }
     .side .saved input { width: 100%; }
-    .side .looklist { grid-template-columns: 1fr 1fr; }
+    .side .looklist { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .side .themes { flex-wrap: wrap; overflow: visible; }
     .side .g3.energy { grid-template-columns: repeat(3, minmax(0, 1fr)); } .side .g3.energy .tile { min-height: 56px; font-size: 14px; }
     .stagegrid .side .label span { display: none; }
-    .stagegrid.vis .centre .pv { width: 100%; max-width: calc((100vh - var(--chrome) - 172px) * 16 / 9); }   /* 172: fader, level and now playing */
-    .stagegrid.vis .centre .level, .stagegrid.vis .centre .under, .stagegrid.vis .centre .np { width: 100%; max-width: calc((100vh - var(--chrome) - 172px) * 16 / 9); margin-left: auto; margin-right: auto; }
+    .stagegrid.vis .centre .pv { width: 100%; max-width: calc((100vh - var(--chrome) - var(--top, 0px) - 166px) * 16 / 9); }   /* 166: the surface chips, fader and level */
+    .stagegrid.vis .centre .level, .stagegrid.vis .centre .under { width: 100%; max-width: calc((100vh - var(--chrome) - var(--top, 0px) - 166px) * 16 / 9); margin-left: auto; margin-right: auto; }
   }
   @media (min-width: 1100px) and (max-height: 820px) {
     #s-lights .label { margin: 14px 2px 8px; } #s-lights .strip { margin-top: 4px; }
@@ -276,7 +316,33 @@
     #s-lights .level { height: 48px; }
   }
 
-  /* ---------------------------------------------------------------- now playing (Visuals, above the picture) */
+  /* ---------------------------------------------------------------- the top strip: now playing and the phase, on both screens */
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 340px); gap: 10px; margin: 0 auto 14px; max-width: 1480px; }
+  .top .np { margin: 0; }
+  @media (min-width: 1100px) and (min-height: 600px) { body[data-screen=lights] .top { max-width: 960px; } }
+  .phase { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; column-gap: 10px; align-items: center;
+           padding: 7px 14px 9px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); overflow: hidden; }
+  .phk { grid-column: 1 / -1; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phk em { font-style: normal; color: var(--text); }
+  .phase b { font-size: 18px; font-weight: 600; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phase.hot b { color: var(--accent); }
+  .phsub { grid-column: 1; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phbeat { grid-column: 2; grid-row: 2 / 4; display: flex; gap: 4px; }
+  .phbeat i { width: 14px; height: 5px; border-radius: 99px; background: var(--border2); }
+  .phbeat i.on { background: var(--text); } .phbeat i.on:first-child { background: var(--accent); }
+  .phbar { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); transition: width .25s linear; }
+  @media (max-width: 560px) {                                   /* pinned under the header on both screens: two compact rows */
+    .top { position: sticky; top: var(--hdr, 64px); z-index: 7; grid-template-columns: 1fr; gap: 0; margin: 0 -14px 10px; background: var(--bg);
+           box-shadow: 0 12px 18px -14px rgba(0,0,0,.7); }
+    .top .np { border-radius: 0; border-width: 0 0 1px; padding: 8px 14px 10px; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; }
+    .phase { border-radius: 0; border-width: 0 0 1px; padding: 5px 14px 7px; grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-rows: auto; column-gap: 8px; }
+    .phsub { text-align: right; }
+    .phk { grid-column: auto; } .phase b { font-size: 14px; } .phsub { grid-column: auto; } .phbeat { grid-column: auto; grid-row: auto; }
+    #s-visuals .pvstack { top: calc(var(--hdr, 64px) + var(--top, 0px)) !important; }
+    #s-lights .strip { top: calc(var(--hdr, 64px) + var(--top, 0px)) !important; }
+  }
+
+  /* ---------------------------------------------------------------- now playing (in the top strip) */
   .np { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center;
         margin-bottom: 10px; padding: 7px 14px 9px 8px; border-radius: 12px; background: var(--card); border: 1px solid var(--border); overflow: hidden; }
   .npart { width: 40px; height: 40px; border-radius: 8px; background: var(--card2) center / cover; display: grid; place-items: center; color: var(--faint); }
@@ -293,7 +359,6 @@
   .npbar .cue { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); }
   .np.idle .npti b { color: var(--dim); font-weight: 500; } .np.idle .npbar { display: none; }
   @media (max-width: 560px) {                                   /* pinned with the picture: one compact row */
-    #s-visuals .pvstack .np { margin: 0; border-radius: 0; border-width: 0 0 1px; padding: 8px 14px 10px; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; }
     .npart { width: 36px; height: 36px; } .npk { display: none; } .npti b { font-size: 14px; } .npr b { font-size: 17px; }
   }
 
@@ -491,6 +556,22 @@
 <div id="off">Can't reach the lighting brain. Lights will come back when it does.</div>
 
 <main>
+  <!-- ======================= TOP: the same on both screens ======================= -->
+  <!-- What's playing, and where the show is in it (the scene engine's phase), plus which screen you're working in. -->
+  <div class="top" id="top">
+    <div class="np" id="np" title="The track the show is following">
+      <div class="npart" id="npArt"></div>
+      <div class="npti"><span class="npk" id="npKick">Now playing</span><b id="npTitle">Nothing playing</b><span class="npsub" id="npSub"></span></div>
+      <div class="npr"><b id="npBpm"></b><span id="npLeft"></span></div>
+      <div class="npbar" id="npBar"><i id="npPos"></i></div>
+    </div>
+    <div class="phase" id="phase" title="Where the show is in the track (the lights' scene engine)">
+      <span class="phk" id="phK">Lights</span>
+      <b id="phScene">—</b>
+      <span class="phsub" id="phSub"></span>
+      <div class="phbeat" id="phBeat"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
   <!-- ======================= LIGHTS ======================= -->
   <section class="screen" id="s-lights">
     <div class="strip" id="strip"></div>
@@ -498,6 +579,12 @@
     <div class="seg" id="scenes">
       <button data-look="AUTO">Auto</button><button data-look="INTRO">Ambient</button><button data-look="GROOVE">Groove</button>
       <button data-look="BREAKDOWN">Break</button><button data-look="DROP">Drop</button>
+    </div>
+    <div class="label">Movement <b id="lPlay"></b></div>
+    <div class="seg" id="plays" title="How the lights play off each other across the stage">
+      <button data-play="AUTO">Auto</button><button data-play="together">Together</button><button data-play="alternate" title="Left on 1 and 3, right on 2 and 4">Alternate</button>
+      <button data-play="swap" title="Left side for half a bar, then the right answers">Call &amp; answer</button><button data-play="bounce" title="A ball across the stage and back, on the 16ths">Bounce</button>
+      <button data-play="chase" title="A sweep across the rig, the other way each bar">Chase</button><button data-play="out" title="From the middle out to the ends">Out</button><button data-play="in" title="From the ends in to the middle">In</button>
     </div>
     <div class="desk-2">
       <div>
@@ -513,7 +600,7 @@
         <div class="label">Colour</div>
         <div class="ringwrap">
           <div class="ringbox"><div class="ring" id="ring"></div><div class="dot" id="ringDot"></div><button class="mid" id="follow">Follow<br>the music</button></div>
-          <div class="ringside"><p id="colourNote">Colours follow the track's key.</p><button class="tile" id="cycle" style="min-height:64px">Cycle<small>Slowly through them all</small></button></div>
+          <div class="ringside"><p id="colourNote">Colours follow the track's key.</p><button class="tile" id="cycle" style="min-height:64px">Cycle<small>Slowly through them all</small></button><button class="tile" id="fromvis" style="min-height:64px">From the visuals<small>The lights take the picture's main colour</small></button></div>
         </div>
       </div>
     </div>
@@ -525,10 +612,10 @@
   <section class="screen stage" id="s-visuals"><div class="stagegrid vis">
     <div class="side left o2">
       <div class="nonly">
-        <div class="label first">Look <b id="lookCount"></b></div>
+        <div class="label first">Look <em class="for" id="lookFor"></em><b id="lookCount"></b></div>
         <div class="themes" id="themes"></div>
         <div class="looklist" id="looklist"></div>
-        <div class="shuf" id="shuf">
+        <div class="shuf fo" id="shuf">
           <div class="row"><button class="ampill" id="shufOn" title="Mixes to another look from this theme every few bars, on the downbeat (L)"><i></i>Shuffle</button>
             <span class="grow"></span><button class="chipbtn" id="shufSkip" title="Mix to the next look on the next downbeat">Skip</button></div>
           <div class="st" id="shufSt">Off</div>
@@ -538,41 +625,60 @@
     </div>
     <div class="centre o1">
       <div class="stick">
-      <div class="np" id="np" title="The track the show is following">
-        <div class="npart" id="npArt"></div>
-        <div class="npti"><span class="npk" id="npKick">Now playing</span><b id="npTitle">Nothing playing</b><span class="npsub" id="npSub"></span></div>
-        <div class="npr"><b id="npBpm"></b><span id="npLeft"></span></div>
-        <div class="npbar" id="npBar"><i id="npPos"></i></div>
-      </div>
       <div class="pv" id="pv"><canvas id="gl"></canvas><canvas id="ov"></canvas>
-        <div class="live" id="liveTag"><i></i><span>Live</span></div>
+        <div class="live" id="liveTag"><i></i><span>On air</span></div>
         <div class="pvbeat" id="pvBeat"><button id="barP"></button><i></i><i></i><i></i><i></i></div>
         <div class="cap"><b id="skName">—</b><button class="pill" id="freeze">Freeze</button><button class="pill" id="next">Next look ›</button></div>
       </div>
-      <div class="under"><div id="intensity" title="How strongly the picture reacts, calm to full on. Glides, stays on the beat."></div></div>
+      <div class="under"><div class="targets" id="targets" title="What the controls play with: the Focus look, or one surface"></div>
+        <div id="intensity" class="fo" title="How strongly the picture reacts, calm to full on. Glides, stays on the beat."></div></div>
       </div>
       <div class="level nonly" id="lvVis" style="margin-top:10px"><div class="fill"></div><div class="t"><span>Projectors</span><span class="v">–</span></div></div>
     </div>
     <div class="side right o3">
-      <div class="nonly energyblk">
-        <div class="label first">Energy <span>a fresh take on this look</span></div>
+      <div class="nudge" id="nudge" hidden>
+        <div class="label first">Position <em class="for" id="nudgeFor"></em><b id="nudgeV">centred</b></div>
+        <div class="nudgebox">
+          <div class="dpad" title="Shift the picture inside the surface (hold to keep going)">
+            <span></span><button data-d="0,-1" aria-label="Up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button><span></span>
+            <button data-d="-1,0" aria-label="Left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button><button class="mid" id="nudgeC" title="Back to the middle">Centre</button><button data-d="1,0" aria-label="Right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+            <span></span><button data-d="0,1" aria-label="Down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><span></span>
+          </div>
+          <div class="xy" id="xyPad" title="Drag to move the picture; double-tap to centre it"><i class="cx"></i><i class="cy"></i><b id="xyDot"></b></div>
+        </div>
+        <div class="zoomrow" title="How big the picture is inside the surface (hold to keep going)">
+          <button data-z="-1" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"/></svg></button><button id="zoomV" title="Back to 100%">100%</button><button data-z="1" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
+        </div>
+        <div class="seg sm" id="nudgeStep" title="How far one tap moves or zooms it"><button data-v="0.005">Fine</button><button data-v="0.02">Normal</button><button data-v="0.08">Big</button></div>
+        <div class="keep"><button class="keepbtn" id="keepBtn" title="Keep this position and size for this sketch on this surface; other sketches keep their own">Set</button><button class="chipbtn" id="forgetBtn" hidden title="Drop the kept position: back to centred">Forget</button></div>
+        <div class="keepst" id="keepSt"></div>
+      </div>
+      <div class="fonote" id="foNote" hidden></div>
+      <div class="nonly energyblk fo">
+        <div class="label first">Energy <span>a fresh take on the Focus look</span></div>
         <div class="g3 energy">
           <button class="tile" data-energy="0.22">Calm<small>Z</small></button>
           <button class="tile" data-energy="0.55">Groove<small>X</small></button>
           <button class="tile" data-energy="0.92">Drop<small>C</small></button>
         </div>
       </div>
-      <div class="label fgap">Presets <b id="pCount"></b></div>
+      <div class="label fgap">Knobs <span>moving with the song</span></div>
+      <div class="shuf" id="knobs">
+        <div class="row"><button class="ampill" id="playOn" title="The look's settings ride the song: some glide somewhere new every few bars, and the busy ones climb through a build and peak on the drop. Within each setting's range; never speeds or choices."><i></i>Play the knobs</button></div>
+        <div class="st" id="playSt">Off · the look holds still</div>
+        <div class="seg sm" id="playAmt" title="How far they move"><button data-v="0.25">Subtle</button><button data-v="0.5">Lively</button><button data-v="1">Wild</button></div>
+      </div>
+      <div class="label fgap">Presets <em class="for" id="presetFor"></em><b id="pCount"></b></div>
       <div class="presets" id="presets"></div>
       <button class="randbtn" id="randPreset" title="A random preset for this look (R)"><span class="dice">⚄</span>Randomise<small>R</small></button>
-      <div class="trans" id="trans">
+      <div class="trans fo" id="trans">
         <div class="label">Changes <b id="tNow"></b></div>
         <div class="seg sm" id="tType" title="How one look hands over to the next"><button data-v="auto">Auto</button><button data-v="cut">Cut</button><button data-v="crossfade">Fade</button><button data-v="pick" title="Each change picks one of the ones you tick">Pick</button><button data-v="more" class="morebtn"><span id="tMoreLbl">More</span><select id="tMore" title="Every transition" aria-label="More transitions"></select></button></div>
         <div class="tpool" id="tPool" hidden></div>
         <div class="seg sm" id="tSync" title="When the change lands"><button data-v="now">Now</button><button data-v="beat">Beat</button><button data-v="bar">Bar</button><button data-v="drop">Drop</button></div>
       </div>
       <a class="padbtn" id="padBtn" href="pad.html"><span><b>Launchpad</b><small>Effects, push, chase: the visuals as pads</small></span><i>›</i></a>
-      <div id="wordsBox" hidden>
+      <div id="wordsBox" class="fo" hidden>
         <div class="label">Words <span>this look draws them</span></div>
         <form class="words" id="wordsForm"><input id="words" placeholder="ONE | TWO | THREE" autocomplete="off" spellcheck="false" enterkeyhint="done"><button class="chipbtn" type="submit">Set</button></form>
         <p class="hint2">Split words with |. One shows at a time.</p>
@@ -583,7 +689,7 @@
 
 <nav class="tabs" id="tabs">
   <button data-s="lights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg><span>Lights</span></button>
-  <button data-s="visuals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><circle cx="12" cy="13.5" r="2"/></svg><span>Visuals</span></button>
+  <button data-s="visuals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="20" height="10" rx="2"/><circle cx="8" cy="13" r="3"/><path d="M14 11h5M14 14h3M6 18v2M18 18v2"/></svg><span>Projection</span></button>
 </nav>
 
 <div id="sheet">
@@ -642,13 +748,14 @@ const pulse = el => { el.classList.add("held"); setTimeout(() => el.classList.re
 
 // ---------------------------------------------------------------- screens
 // The full page behind each screen: where "Full controls" goes from here.
-const FULL = { lights: [8090, "/"], visuals: [8110, "/"] };
+const FULL = { lights: [8090, "/"], visuals: [8100, "/edit"] };   // the Projection screen's is the Projection editor
 function show(name) {
   if (!FULL[name]) name = "visuals";                    // a screen this page no longer has (Decks, Mapping, Stage)
   const fp = FULL[name]; $("fullBtn").href = at(fp[0], fp[1]);
   on("#tabs button", b => b.dataset.s === name);
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("on", s.id === "s-" + name));
   localStorage.setItem("s5show", name);
+  document.body.dataset.screen = name;                  // the top strip takes the screen's width
   requestAnimationFrame(resize);
 }
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => show(b.dataset.s));
@@ -664,6 +771,7 @@ document.querySelectorAll("#sheet a[data-port]").forEach(a => a.href = at(a.data
 // ---------------------------------------------------------------- lights
 let S = {};
 document.querySelectorAll("[data-look]").forEach(b => b.onclick = () => cmd("look", b.dataset.look, "Scene"));
+document.querySelectorAll("[data-play]").forEach(b => b.onclick = () => cmd("play", b.dataset.play, "Movement"));
 
 function holdPad(el, name) {
   const set = v => { if (el.classList.contains("held") === v) return; el.classList.toggle("held", v); cmd(name, v, el.firstChild.textContent); };
@@ -698,6 +806,7 @@ function placeDot(h, show) {
 }
 $("follow").onclick = () => cmd("palette", { mode: "auto" }, "Colour");
 $("cycle").onclick = () => cmd("palette", { mode: S.palette && S.palette.mode === "cycle" ? "auto" : "cycle" }, "Colour");
+$("fromvis").onclick = () => cmd("palette", { mode: S.palette && S.palette.mode === "visuals" ? "auto" : "visuals" }, "Colour");
 
 // Levels: drag anywhere on the bar. While a finger is on it, the live value doesn't fight it.
 function level(el, onSet) {
@@ -718,8 +827,10 @@ const showLights = level($("lvLights"), v => cmd("intensity", v, "Lights level")
 function overrides() {
   const o = [];
   if (S.look) o.push(`${{ INTRO: "Ambient", GROOVE: "Groove", BREAKDOWN: "Break", DROP: "Drop" }[S.look]} scene`);
+  if (S.play_lock) o.push(`${PLAY_NAME[S.play_lock] || S.play_lock} movement`);
   if (S.palette && S.palette.mode === "lock") o.push("colour locked");
   if (S.palette && S.palette.mode === "cycle") o.push("colour cycling");
+  if (S.palette && S.palette.mode === "visuals") o.push("colour from the visuals");
   if (S.speed && S.speed !== 1) o.push(`${S.speed}× speed`);
   if (S.mode === "blackout") o.push("blackout");
   else if (S.mode === "manual") o.push("manual");
@@ -742,16 +853,20 @@ function renderPilot() {
 
 const NICE = { IDLE: "Waiting", INTRO: "Ambient", GROOVE: "Groove", BUILD: "Building", HOLD: "Holding", PREDROP: "Here it comes", DROP: "Drop", BREAKDOWN: "Break", OUTRO: "Outro" };
 const nice = s => NICE[s] || (s ? s[0] + s.slice(1).toLowerCase() : "—");
+const PLAY_NAME = { together: "Together", alternate: "Alternate", swap: "Call & answer", bounce: "Bounce", chase: "Chase", out: "Out", in: "In" };
 let strips = "";
 function renderLights() {
   on("[data-look]", b => (S.look || "AUTO") === b.dataset.look);
   $("lScene").textContent = S.look ? "" : `following the music · ${nice(S.scene)}`;
+  on("[data-play]", b => (S.play_lock || "AUTO") === b.dataset.play);
+  $("lPlay").textContent = S.play_lock ? "" : `picked by the track · ${PLAY_NAME[S.play] || "—"}`;
   $("black").classList.toggle("on", S.mode === "blackout");
   document.body.classList.toggle("dark", S.mode === "blackout");
   const pm = S.palette ? S.palette.mode : "auto";
   $("follow").classList.toggle("on", pm === "auto");
   $("cycle").classList.toggle("on", pm === "cycle");
-  $("colourNote").textContent = pm === "lock" ? "Locked to this colour. Tap the middle to hand it back." : pm === "cycle" ? "Cycling through every colour." : "Colours follow the track's key.";
+  $("fromvis").classList.toggle("on", pm === "visuals");
+  $("colourNote").textContent = pm === "lock" ? "Locked to this colour. Tap the middle to hand it back." : pm === "cycle" ? "Cycling through every colour." : pm === "visuals" ? (S.visual ? "Following the projected picture's main colour." : "Waiting for the projector page (no colour from it yet): following the track's key.") : "Colours follow the track's key.";
   if (!ringBusy) placeDot(S.palette ? S.palette.hue : 0, pm === "lock");
   showLights(S.intensity);
   if (S.hue != null) document.body.style.setProperty("--glow", `hsla(${Math.round(S.hue * 360)},100%,55%,${(0.18 + 0.3 * (S.energy ?? 0.5)).toFixed(2)})`);
@@ -781,19 +896,22 @@ poll();
 // ---------------------------------------------------------------- visuals
 let SK = null, AU = {}, FREEZE = false, lastPreset = "", PV = {};
 const R = new MapRenderer($("gl"), $("ov"));
-R.layout = { lead_ms: 60, brightness: 1, masks: [], surfaces: [
+// Until the projector's layout arrives (or if it has no surfaces), the Focus look full frame.
+const FULLFRAME = { lead_ms: 60, brightness: 1, masks: [], surfaces: [
   { id: "p", content: "gen", opacity: 1, hue_shift: 0, corners: [[0, 0], [1, 0], [1, 1], [0, 1]] }] };
+R.layout = FULLFRAME;
 // Only resize while the preview is showing; hidden, it keeps rendering small for the room glow.
 const AR = new AutoRes(() => resize());   // drops the preview's resolution only if this device can't keep up
 function resize() { const r = $("pv").getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1) * AR.scale; if (r.width) R.resize(Math.round(r.width * d), Math.round(r.height * d)); }
 addEventListener("resize", resize);
 
 connectEvents(R, { pauseHidden: true,
-  onStatus: ok => { const t = $("liveTag"); t.classList.toggle("off", !ok); t.querySelector("span").textContent = ok ? (FREEZE ? "Frozen" : "Live") : "Reconnecting"; },
-  onSketch: sk => { SK = sk; $("skName").textContent = sk.title || sk.name; refreshPresets(); paintLookState(); paintWords(); },
+  onStatus: ok => { const t = $("liveTag"); t.classList.toggle("off", !ok); t.querySelector("span").textContent = ok ? (FREEZE ? "Frozen" : "On air") : "Reconnecting"; },
+  onSketch: sk => { SK = sk; tgKey = null; paintTarget(); refreshPresets(); paintLookState(); paintWords(); },
   onAuto: (a, frz) => {
+    renderPlay();
     AU = a; FREEZE = !!frz; $("freeze").classList.toggle("on", FREEZE); $("freeze").textContent = FREEZE ? "Frozen" : "Freeze";
-    $("liveTag").classList.toggle("frozen", FREEZE); $("liveTag").querySelector("span").textContent = FREEZE ? "Frozen" : "Live";
+    $("liveTag").classList.toggle("frozen", FREEZE); $("liveTag").querySelector("span").textContent = FREEZE ? "Frozen" : "On air";
     renderPilot();
   },
   onParams: p => { PV = p || {}; if (SK) INT.set(VJ.intensityOf(params(), loOf, hiOf, PV)); },
@@ -813,26 +931,65 @@ function energy(e, b) {
   const v = VJ.energyValues(params(), loOf, hiOf, e);
   send("/api/params", v, "Visuals").then(r => { if (r) { lastPreset = ""; paintPresets(); } });
 }
-$("next").onclick = async () => { const r = await send("/api/next", {}, "Next look"); if (r) toast("Mixing to " + r.sketch); };
+$("next").onclick = async () => {
+  const t = TG();
+  if (t) {                                                // a surface: another look from the theme, its own
+    const th = THEMES.find(x => x.id === themeNow()), pool = (th ? th.sketches : ALL).filter(n => n !== t.sketch && n !== (SK && SK.name));
+    if (!pool.length) return;
+    const n = pool[Math.floor(Math.random() * pool.length)];
+    if (await setSurface(t.id, pinTo(n), "Next look")) toast(`${t.name || t.id}: ${titleOf(n)}`);
+    return;
+  }
+  const r = await send("/api/next", {}, "Next look"); if (r) toast("Mixing to " + r.sketch);
+};
 function setFreeze(f) { send("/api/auto", { _freeze: f }, "Freeze"); }
+// The knob player (render.js playEval): one setting for every page and projector, held by the visuals service.
+function renderPlay() {
+  const p = R.genPlay || { on: false, amount: 0.5 };
+  $("playOn").classList.toggle("on", !!p.on);
+  const near = [...$("playAmt").querySelectorAll("button")].reduce((b, x) => Math.abs(+x.dataset.v - p.amount) < Math.abs(+b.dataset.v - p.amount) ? x : b);
+  $("playAmt").querySelectorAll("button").forEach(b => b.classList.toggle("on", !!p.on && b === near));
+  $("playSt").textContent = p.on ? `${near.textContent} · the knobs follow the song` : "Off · the look holds still";
+}
+$("playOn").onclick = () => send("/api/auto", { _play: { on: !(R.genPlay && R.genPlay.on) } }, "Play the knobs");
+$("playAmt").querySelectorAll("button").forEach(b => b.onclick = () => send("/api/auto", { _play: { on: true, amount: +b.dataset.v } }, "Play the knobs"));
 $("freeze").onclick = () => setFreeze(!FREEZE);
 
 let PRESETS = [];
 async function refreshPresets() {
-  try { PRESETS = (await (await fetch("/api/presets", { cache: "no-store" })).json()).presets || []; } catch (e) { PRESETS = []; }
+  // A surface with a look of its own: that sketch's presets, and loading one sets the surface's. Otherwise the Focus look's.
+  const o = typeof own === "function" ? own() : null, t = typeof TG === "function" ? TG() : null;
+  const url = o ? `/api/presets?sketch=${encodeURIComponent(o.sketch)}` : "/api/presets";
+  try { PRESETS = (await (await fetch(url, { cache: "no-store" })).json()).presets || []; } catch (e) { PRESETS = []; }
+  if (o) lastPreset = o.preset || "";
   if (!PRESETS.includes(lastPreset)) lastPreset = "";
-  $("pCount").textContent = PRESETS.length ? `${PRESETS.length} for ${SK ? SK.title || SK.name : "this look"}` : "";
+  $("presetFor").textContent = t ? "for " + (t.name || t.id) : "";
+  $("pCount").textContent = PRESETS.length ? `${PRESETS.length} for ${o ? titleOf(o.sketch) : SK ? SK.title || SK.name : "this look"}` : "";
   $("presets").innerHTML = PRESETS.length ? PRESETS.map(() => `<button class="tile"></button>`).join("")
     : `<div class="none">No presets for this look yet. Save some in Setup → Design looks.</div>`;
   [...$("presets").children].forEach((b, i) => {
     if (!b.classList.contains("tile")) return;
     const n = PRESETS[i]; b.dataset.p = n;
     b.textContent = n.replace(/[-_]+/g, " ").replace(/^./, c => c.toUpperCase());
-    b.onclick = async () => { if (await send(`/api/presets/${encodeURIComponent(n)}/load`, {}, "Preset")) { lastPreset = n; paintPresets(); } };
+    b.onclick = () => loadPreset(n);
   });
   paintPresets();
 }
 const paintPresets = () => on("#presets [data-p]", b => b.dataset.p === lastPreset);
+// Load a preset into the target: the Focus look (the visuals service), or the picked surface's own look.
+// A surface that was playing Focus keeps that sketch, as its own, with the preset.
+async function loadPreset(n, what = "Preset") {
+  const t = TG();
+  if (t && t.content === "gen") {
+    const sk = t.sketch || (SK && SK.name);
+    if (!sk) return false;
+    if (await setSurface(t.id, pinTo(sk, n), what)) { lastPreset = n; paintPresets(); return true; }
+    return false;
+  }
+  if (t) { toast(`${t.name || t.id} shows ${shows(t)}: pick a look for it first`); return false; }
+  if (await send(`/api/presets/${encodeURIComponent(n)}/load`, {}, what)) { lastPreset = n; paintPresets(); return true; }
+  return false;
+}
 
 // Randomise: a random preset for this look (never the one that's on). A look with no presets gets a
 // fresh random take instead, inside each setting's range.
@@ -841,12 +998,13 @@ async function randomise() {
   const pool = PRESETS.filter(n => n !== lastPreset);
   if (pool.length) {
     const n = pool[Math.floor(Math.random() * pool.length)];
-    if (await send(`/api/presets/${encodeURIComponent(n)}/load`, {}, "Randomise")) {
-      lastPreset = n; paintPresets();
+    if (await loadPreset(n, "Randomise")) {
       const el = [...$("presets").querySelectorAll("[data-p]")].find(x => x.dataset.p === n);
       if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
       toast(`Randomised: ${el ? el.textContent : n}`);
     }
+  } else if (own()) {
+    toast(`${titleOf(own().sketch)} has no presets yet`);
   } else if (SK) {
     const v = VJ.energyValues(params(), loOf, hiOf, Math.random());
       if (await send("/api/params", v, "Randomise")) toast("Randomised this look");
@@ -863,7 +1021,7 @@ const themeNow = () => (SHUF && SHUF.theme) || "all";
 async function loadLooks() {
   try { const j = await (await fetch("/api/sketches", { cache: "no-store" })).json(); THEMES = j.themes || []; TITLES = j.titles || {}; ALL = j.sketches || []; } catch (e) {}
   try { SHUF = SHUF || await (await fetch("/api/shuffle", { cache: "no-store" })).json(); } catch (e) {}
-  paintLooks(); paintShuffle();
+  paintLooks(); paintShuffle(); paintTarget();
 }
 function paintLooks() {
   const tid = themeNow(), th = THEMES.find(t => t.id === tid);
@@ -872,16 +1030,27 @@ function paintLooks() {
   $("themes").querySelectorAll("button").forEach(b => b.onclick = () => { if (b.dataset.t !== themeNow()) send("/api/shuffle", { theme: b.dataset.t }, "Theme"); });
   const list = tid === "all" ? [...ALL].sort((a, b) => titleOf(a).localeCompare(titleOf(b))) : (th ? th.sketches : []);
   $("lookCount").textContent = th ? th.blurb || "" : `${ALL.length} looks`;
-  $("looklist").innerHTML = list.map(n => `<button data-s="${esc(n)}"><span>${esc(titleOf(n))}</span></button>`).join("");
+  const t = typeof TG === "function" ? TG() : null;
+  $("looklist").innerHTML = (t && !(t.content === "gen" && !t.sketch) ? `<button data-s="" class="tofocus" title="Back to the Focus look, with the other Focus surfaces"><span>↩ Focus · ${esc(focusName())}</span></button>` : "") +
+    list.map(n => `<button data-s="${esc(n)}"><span>${esc(titleOf(n))}</span></button>`).join("");
   $("looklist").querySelectorAll("button").forEach(b => b.onclick = () => pickLook(b.dataset.s));
   const cur = $("themes").querySelector(".on"); if (cur) cur.scrollIntoView({ block: "nearest", inline: "nearest" });
   paintLookState();
 }
 function paintLookState() {
-  const cur = SK && SK.name, q = SHUF && SHUF.queue && SHUF.queue.sketch;
+  const t = typeof TG === "function" ? TG() : null;
+  const cur = t ? (t.content === "gen" ? t.sketch || (SK && SK.name) : null) : SK && SK.name, q = !t && SHUF && SHUF.queue && SHUF.queue.sketch;
   $("looklist").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.s === cur); b.classList.toggle("pend", b.dataset.s === q && b.dataset.s !== cur); });
 }
 async function pickLook(n) {
+  const t = TG();
+  if (t) {                                                // a surface: it gets that look of its own (or goes back to Focus)
+    const nm = t.name || t.id;
+    if (!n) { if (await setSurface(t.id, pinTo(null), "Look")) toast(`${nm} is back on Focus`); return; }
+    if (t.content === "gen" && t.sketch === n) return toast(`${titleOf(n)} is already on ${nm}`);
+    if (await setSurface(t.id, pinTo(n), "Look")) toast(`${nm}: ${titleOf(n)}`);
+    return;
+  }
   if (SK && n === SK.name) return toast(`${titleOf(n)} is already on`);
   if (await send("/api/select", { sketch: n }, "Look")) toast(`Mixing to ${titleOf(n)}`);
 }
@@ -946,6 +1115,7 @@ $("tSync").querySelectorAll("button").forEach(b => b.onclick = () => setTrans({ 
 loadTrans();
 // The header's height, for what sticks under it on phones.
 new ResizeObserver(() => document.documentElement.style.setProperty("--hdr", document.querySelector("header").offsetHeight + "px")).observe(document.querySelector("header"));
+new ResizeObserver(() => document.documentElement.style.setProperty("--top", ($("top").offsetHeight + 14) + "px")).observe($("top"));
 
 // Intensity: one fader for how busy the picture is, played live. It stays on the beat: speeds snap
 // to note values and nothing is retimed (see VJ.intensityValues).
@@ -970,7 +1140,7 @@ addEventListener("pointerdown", e => { if (e.pointerType === "touch" && e.target
 // One loop: the preview, the room glow behind the app, and the beat.
 // The audio monitor, stacked under the picture; on phones the two stay pinned together.
 const drawWave = VJ.waveStrip($("pv"), R);
-{ const st = document.createElement("div"); st.className = "pvstack"; const box = $("pv").nextElementSibling; $("pv").before(st); st.append($("np"), $("pv"), box); }
+{ const st = document.createElement("div"); st.className = "pvstack"; const box = $("pv").nextElementSibling; $("pv").before(st); st.append($("pv"), box); }
 const paintWaveV = () => { const on = VJ.waveOn(); $("waveV").classList.toggle("on", on); $("waveV").setAttribute("aria-checked", on); };
 $("waveV").onclick = () => { VJ.waveOn(!VJ.waveOn()); paintWaveV(); };
 addEventListener("s5wavepv", paintWaveV); paintWaveV();
@@ -978,14 +1148,14 @@ let ambAt = 0;   // the room glow: a copy of the picture a few times a second (r
 const amb = $("amb").getContext("2d"), pvDots = [...$("pvBeat").querySelectorAll("i")];
 const barP = VJ.barCounter($("barP"));
 requestAnimationFrame(function frame(now) {
-  R.draw(now); AR.frame(now);
+  R.draw(now, { projector: PROJ }); AR.frame(now); outlines();
   if (now - ambAt > 250 && document.documentElement.dataset.theme !== "light") {   // the glow is hidden in light mode
     ambAt = now; try { amb.drawImage($("gl"), 0, 0, 32, 18); } catch (e) {}
   }
   const f = R.lastFrame;
   if (f) for (const set of [pvDots]) set.forEach((d, i) => d.classList.toggle("on", i === Math.round(f.bwb) - 1 && 1 - f.frac > 0.4));
   INT.beat(f);
-  drawWave(f); barP(f);
+  drawWave(f); barP(f); paintPhase(f);
   requestAnimationFrame(frame);
 });
 
@@ -995,10 +1165,220 @@ let LAY = null;
 const showVis = level($("lvVis"), async v => { const l = LAY; if (!l) return; l.brightness = v; await send(LAYOUT, l, "Projector level"); });
 async function pollLayout() {
   if (document.hidden) return setTimeout(pollLayout, 2000);
-  try { LAY = await (await fetch(LAYOUT, { cache: "no-store" })).json(); showVis(LAY.brightness); } catch (e) {}
-  setTimeout(pollLayout, 2000);
+  try { LAY = await (await fetch(LAYOUT, { cache: "no-store" })).json(); showVis(LAY.brightness); useLayout(LAY); } catch (e) {}
+  setTimeout(pollLayout, document.querySelector("#s-visuals.on") ? 1000 : 2000);
 }
+
+// ---------------------------------------------------------------- projection: the mapped picture, and what each surface shows
+// The preview is the projector's own output, as mapped (its layout from :8100): every surface playing
+// what it plays. Tap a surface (in the picture or the list) to pick it out; its picker says what it
+// shows: Focus (the look on the left, the one Shuffle plays), a sketch of its own, or a built-in.
+// The projector picked is shared with the Projection editor (s5proj).
+let PROJ = localStorage.getItem("s5proj") || "", SEL = null, presetsFor = {};
+const projOf = x => x.projector || "main";
+const mineS = () => LAY ? LAY.surfaces.filter(x => projOf(x) === R.projectorId(PROJ)) : [];
+// The target: the surface picked (null = the Focus look), and that surface if it plays a sketch of its own.
+const TG = () => SEL ? mineS().find(x => x.id === SEL) || null : null;
+const own = () => { const t = TG(); return t && t.content === "gen" && t.sketch ? t : null; };
+const BUILT = { show: "Lights' colours", pulse: "Beat flash", tunnel: "Tunnel", bars: "Bars", title: "Track name", solid: "Solid colour", test: "Test grid" };
+const focusName = () => SK ? SK.title || SK.name : "Focus";
+const shows = x => x.content !== "gen" ? BUILT[x.content] || x.content : x.sketch ? titleOf(x.sketch) + (x.preset ? " · " + x.preset : "") : "Focus · " + focusName();
+function useLayout(l) {
+  R.layout = l && l.surfaces.some(x => projOf(x) === R.projectorId(PROJ)) ? l : FULLFRAME;
+  if (R.layout !== FULLFRAME) R.layout.lead_ms = l.lead_ms ?? 60;
+  if (SEL && !TG()) SEL = null;                          // its surface went (deleted in the editor)
+  if (NUDGE) {                                           // a nudge still settling: keep it, not the poll's older copy
+    const x = mineS().find(y => y.id === NUDGE.id);
+    if (x && performance.now() < NUDGE.until) { x.off_x = NUDGE.x; x.off_y = NUDGE.y; x.zoom = NUDGE.z; x.off_for = NUDGE.key; } else NUDGE = null;
+  }
+  paintTarget();
+}
+function target(id) { SEL = id; paintTarget(); }
+let tgKey = null;
+function paintTarget() {
+  const list = mineS(), projs = (LAY && LAY.projectors) || [], t = TG(), o = own(), P = R.projectorId(PROJ);
+  // The chips under the picture: Focus, then every surface of this projector (and which projector, if there are more).
+  const nFocus = list.filter(x => x.content === "gen" && !x.sketch).length;
+  const html = (projs.length > 1 ? `<select id="projPick" aria-label="Projector">${projs.map(p => `<option value="${esc(p.id)}"${p.id === P ? " selected" : ""}>${esc(p.name)}</option>`).join("")}</select>` : "") +
+    (list.length ? `<button class="tchip${t ? "" : " on"}" data-id=""><b>Focus</b><small>${esc(focusName())}${list.length ? ` · ${nFocus} surface${nFocus === 1 ? "" : "s"}` : ""}</small></button>` +
+      list.map(x => `<button class="tchip${t && t.id === x.id ? " on" : ""}" data-id="${esc(x.id)}"><b>${esc(x.name || x.id)}</b><small>${esc(shows(x))}</small></button>`).join("") : "");
+  if ($("targets").innerHTML !== html) {
+    $("targets").innerHTML = html;
+    $("targets").querySelectorAll(".tchip").forEach(b => b.onclick = () => target(b.dataset.id || null));
+    const pp = $("projPick"); if (pp) pp.onchange = () => { PROJ = pp.value; localStorage.setItem("s5proj", PROJ); SEL = null; useLayout(LAY); };
+  }
+  // Say what the panels are working on, and step back what only plays the Focus look.
+  const name = t ? t.name || t.id : "";
+  $("lookFor").textContent = t ? "for " + name : list.length ? "Focus" : "";
+  $("skName").textContent = t ? `${name} · ${shows(t)}` : "Focus · " + focusName();
+  document.body.classList.toggle("own", !!o);
+  paintNudge();
+  $("foNote").hidden = !o;
+  if (o) $("foNote").textContent = `Playing with ${name}: the look and presets are its own. Energy, Intensity, Shuffle, Changes and Words play the Focus look; tap Focus under the picture for them.`;
+  const key = o ? o.id + "|" + o.sketch + "|" + (o.preset || "") : t ? "t" : "focus";
+  if (key !== tgKey) { tgKey = key; refreshPresets(); paintLooks(); }
+}
+// Change one surface: on a fresh copy of the layout, so a change made in the editor meanwhile isn't undone.
+async function setSurface(id, change, what = "Surface") {
+  let l;
+  try { l = await (await fetch(LAYOUT, { cache: "no-store" })).json(); } catch (e) { return toast("Projection: can't reach it"); }
+  const x = l.surfaces.find(y => y.id === id);
+  if (!x) return toast("That surface has gone (changed in the editor?)");
+  change(x);
+  if (await send(LAYOUT, l, what)) { LAY = l; useLayout(l); return true; }
+}
+const pinTo = (n, preset = null) => x => Object.assign(x, n ? { content: "gen", sketch: n, preset } : { content: "gen", sketch: null, preset: null });
+// ---------- Position: nudge the picture inside the picked surface (off_x / off_y in the layout; render.js
+// draws the content shifted, the corners stay put). It moves on this preview at once and saves a moment
+// later; while it's settling, the layout poll can't snap it back.
+let NUDGE = null, nTimer = 0, nStep = +localStorage.getItem("s5nudge") || 0.02;
+const NMAX = 0.5;
+// Each sketch keeps its own place on a surface (render.js fitOf): what's adjusted here is a draft for the
+// sketch on it now, and Set keeps it in the surface's "fit" for that sketch.
+const keyOf = t => fitKey(t, SK && SK.name);
+const offOf = t => { if (NUDGE && NUDGE.id === t.id && NUDGE.key === keyOf(t)) return NUDGE;
+  const f = fitOf(t, keyOf(t)); return { x: f[0], y: f[1], z: f[2] }; };
+const keptOf = t => (t.fit || {})[keyOf(t)] || null;
+const sameFit = (o, k) => k ? Math.abs(o.x - k[0]) < 1e-4 && Math.abs(o.y - k[1]) < 1e-4 && Math.abs(o.z - k[2]) < 1e-4 : Math.abs(o.x) < 1e-4 && Math.abs(o.y) < 1e-4 && Math.abs(o.z - 1) < 1e-4;
+const keyName = t => t.content === "gen" ? titleOf(keyOf(t)) : BUILT[t.content] || t.content;
+const offWords = o => { const w = (v, a, b) => Math.abs(v) < 0.0025 ? "" : `${Math.round(Math.abs(v) * 100)}% ${v > 0 ? b : a}`;
+  return [w(o.x, "left", "right"), w(o.y, "up", "down")].filter(Boolean).join(", ") || "centred"; };
+function paintNudge() {
+  const t = TG();
+  $("nudge").hidden = !t;
+  on("#nudgeStep button", b => +b.dataset.v === nStep);
+  if (!t) return;
+  const o = offOf(t);
+  $("nudgeFor").textContent = "for " + (t.name || t.id);
+  $("nudgeV").textContent = offWords(o);
+  $("xyDot").style.left = (50 + o.x / NMAX * 50) + "%"; $("xyDot").style.top = (50 + o.y / NMAX * 50) + "%";
+  $("zoomV").textContent = Math.round(o.z * 100) + "%";
+  const kept = keptOf(t), saved = sameFit(o, kept), nm = keyName(t);
+  $("keepBtn").textContent = saved && kept ? "Kept ✓" : `Set for ${nm}`;
+  $("keepBtn").classList.toggle("attn", !saved); $("keepBtn").classList.toggle("done", saved && !!kept);
+  $("forgetBtn").hidden = !kept;
+  $("keepSt").textContent = saved ? (kept ? `${nm} sits here on ${t.name || t.id}; other sketches keep their own.` : `${nm} is centred here (nothing kept).`)
+    : `Not kept yet: when ${t.name || t.id} changes sketch this goes. Set keeps it for ${nm}.`;
+}
+function nudgeTo(x, y, z) {
+  const t = TG(); if (!t) return;
+  const c = v => Math.round(Math.max(-NMAX, Math.min(NMAX, v)) * 1000) / 1000;
+  x = c(x); y = c(y); z = Math.round(Math.max(0.5, Math.min(2.5, z ?? offOf(t).z)) * 1000) / 1000;
+  const key = keyOf(t);
+  NUDGE = { id: t.id, key, x, y, z, until: performance.now() + 2000 };
+  t.off_x = x; t.off_y = y; t.zoom = z; t.off_for = key;  // the preview draws from this same layout object
+  paintNudge();
+  clearTimeout(nTimer);
+  nTimer = setTimeout(async () => {
+    const n = NUDGE; if (!n) return;
+    await setSurface(n.id, x2 => { x2.off_x = n.x; x2.off_y = n.y; x2.zoom = n.z; x2.off_for = n.key; }, "Position");
+    if (NUDGE === n) NUDGE.until = performance.now() + 800;
+  }, 160);
+}
+const nudgeBy = (dx, dy) => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x + dx * nStep, o.y + dy * nStep); } };
+$("nudge").querySelectorAll("[data-d]").forEach(b => {
+  const [dx, dy] = b.dataset.d.split(",").map(Number);
+  let rep = 0;
+  const stop = () => { clearTimeout(rep); clearInterval(rep); b.classList.remove("held"); };
+  b.onpointerdown = e => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add("held"); nudgeBy(dx, dy);
+    rep = setTimeout(() => { rep = setInterval(() => nudgeBy(dx, dy), 70); }, 350); };
+  b.onpointerup = b.onpointercancel = b.onlostpointercapture = stop;
+});
+$("nudgeC").onclick = () => nudgeTo(0, 0);
+// Set: keep the position for this sketch on this surface. Forget: drop it (back to centred).
+$("keepBtn").onclick = async () => {
+  const t = TG(); if (!t) return;
+  const o = offOf(t), key = keyOf(t), nm = keyName(t);
+  clearTimeout(nTimer);
+  if (await setSurface(t.id, x => { x.fit = Object.assign({}, x.fit, { [key]: [o.x, o.y, o.z] }); x.off_x = o.x; x.off_y = o.y; x.zoom = o.z; x.off_for = key; }, "Set"))
+    toast(`Kept: ${nm} on ${t.name || t.id}`);
+  NUDGE = null; paintNudge();
+};
+$("forgetBtn").onclick = async () => {
+  const t = TG(); if (!t) return;
+  const key = keyOf(t), nm = keyName(t);
+  clearTimeout(nTimer);
+  if (await setSurface(t.id, x => { const f = Object.assign({}, x.fit); delete f[key]; x.fit = f; x.off_x = 0; x.off_y = 0; x.zoom = 1; x.off_for = key; }, "Forget"))
+    toast(`${nm} is centred on ${t.name || t.id} again`);
+  NUDGE = null; paintNudge();
+};
+// Zoom: each tap is a step of the same size as the nudge's (Fine 0.75%, Normal 3%, Big 12%), around the surface's centre.
+const zoomBy = d => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x, o.y, o.z * Math.pow(1 + nStep * 1.5, d)); } };
+$("nudge").querySelectorAll("[data-z]").forEach(b => {
+  const d = +b.dataset.z; let rep = 0;
+  const stop = () => { clearTimeout(rep); clearInterval(rep); b.classList.remove("held"); };
+  b.onpointerdown = e => { e.preventDefault(); b.setPointerCapture(e.pointerId); b.classList.add("held"); zoomBy(d);
+    rep = setTimeout(() => { rep = setInterval(() => zoomBy(d), 70); }, 350); };
+  b.onpointerup = b.onpointercancel = b.onlostpointercapture = stop;
+});
+$("zoomV").onclick = () => { const t = TG(); if (t) { const o = offOf(t); nudgeTo(o.x, o.y, 1); } };
+$("xyPad").addEventListener("wheel", e => { if (!TG()) return; e.preventDefault(); zoomBy(e.deltaY < 0 ? 0.5 : -0.5); }, { passive: false });
+$("nudgeStep").querySelectorAll("button").forEach(b => b.onclick = () => { nStep = +b.dataset.v; localStorage.setItem("s5nudge", nStep); paintNudge(); });
+{ // the pad: drag anywhere to move the picture with your finger (relative, so a touch never jumps it); double-tap centres
+  const pad = $("xyPad"); let st = null, lastTap = 0;
+  pad.onpointerdown = e => { const t = TG(); if (!t) return; e.preventDefault(); pad.setPointerCapture(e.pointerId);
+    const now = performance.now(); if (now - lastTap < 300) { nudgeTo(0, 0); st = null; return; } lastTap = now;
+    const o = offOf(t), r = pad.getBoundingClientRect(); st = { x: e.clientX, y: e.clientY, ox: o.x, oy: o.y, w: r.width, h: r.height }; };
+  pad.onpointermove = e => { if (!st) return; const k = e.shiftKey ? 0.25 : 1;
+    nudgeTo(st.ox + (e.clientX - st.x) / st.w * 2 * NMAX * k, st.oy + (e.clientY - st.y) / st.h * 2 * NMAX * k); };
+  pad.onpointerup = pad.onpointercancel = () => { st = null; };
+}
+// Arrow keys nudge too, and - / = zoom, on the Projection screen with a surface picked (Shift = Big).
+addEventListener("keydown", e => {
+  const z = { "-": -1, "_": -1, "=": 1, "+": 1 }[e.key];
+  const d = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
+  if ((!d && !z) || !document.querySelector("#s-visuals.on") || !TG() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (z) return zoomBy(z * (e.shiftKey ? 0.08 / nStep : 1));
+  const k = e.shiftKey ? 0.08 / nStep : 1; nudgeBy(d[0] * k, d[1] * k);
+}, true);
+
+// The target, marked on the picture: the surface picked, or every surface playing Focus (the rest faint).
+function outlines() {
+  if (R.layout === FULLFRAME) return;
+  const o = R.o, W = R.ov.width, H = R.ov.height, d = Math.max(1, W / 900), t = TG();
+  R.ovDirty = true;
+  for (const x of mineS()) {
+    const on = t ? x.id === t.id : x.content === "gen" && !x.sketch;
+    o.strokeStyle = on ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.16)"; o.lineWidth = (on ? 3 : 1) * d;
+    o.setLineDash(on && !t ? [8 * d, 6 * d] : []);
+    o.beginPath(); x.corners.forEach(([u, v], i) => i ? o.lineTo(u * W, v * H) : o.moveTo(u * W, v * H)); o.closePath(); o.stroke();
+  }
+  o.setLineDash([]);
+}
+const inside = (pt, c) => { let r = false; for (let i = 0, j = c.length - 1; i < c.length; j = i++)
+  if ((c[i][1] > pt[1]) !== (c[j][1] > pt[1]) && pt[0] < (c[j][0] - c[i][0]) * (pt[1] - c[i][1]) / (c[j][1] - c[i][1]) + c[i][0]) r = !r; return r; };
+// Tap a surface on the picture to play with it; tap it again (or anywhere else) to go back to Focus.
+$("ov").addEventListener("click", e => {
+  const r = $("ov").getBoundingClientRect(), pt = [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+  const hit = mineS().filter(x => inside(pt, x.corners)).pop();       // the top one: drawn last
+  target(hit && hit.id !== SEL ? hit.id : null);
+});
 pollLayout();
+
+// ---------------------------------------------------------------- the phase (top strip)
+// Where the show is in the track, the same on both screens: the scene engine's phase in words, the
+// bar and how far to the drop, the movement the lights are playing, the beat; and which screen
+// you're in (with the surface you're playing with, on Projection).
+const phDots = [...$("phBeat").querySelectorAll("i")];
+let phKey = "";
+function paintPhase(f) {
+  if (f) phDots.forEach((d, i) => d.classList.toggle("on", i === Math.round(f.bwb) - 1 && 1 - f.frac > 0.4));
+  const scr = document.querySelector("#s-lights.on") ? "Lights" : "Projection", t = scr === "Projection" && typeof TG === "function" ? TG() : null;
+  const sc = S.scene, btd = S.beats_to_drop, sub = [];
+  if (S.bar) sub.push(`bar ${S.bar}`);
+  if (sc === "BUILD" || sc === "HOLD") sub.push(`${Math.round((S.progress || 0) * 100)}% built`);
+  if (sc === "DROP" && S.since_drop != null) sub.push(`${Math.floor(S.since_drop / 4) + 1} bars in`);
+  else if (btd) sub.push(btd <= 8 ? `drop in ${Math.ceil(btd)} beats` : `drop in ${Math.ceil(btd / 4)} bars`);
+  if (S.play && sc !== "IDLE") sub.push(PLAY_NAME[S.play] || S.play);
+  const key = [scr, t && (t.name || t.id), sc, S.look, sub.join()].join("|");
+  if (key === phKey) return;
+  phKey = key;
+  $("phK").innerHTML = esc(scr) + (t ? ` · <em>${esc(t.name || t.id)}</em>` : scr === "Projection" ? " · <em>Focus</em>" : "") + (S.look ? " · held" : "");
+  $("phScene").textContent = sc ? nice(sc) : "—";
+  $("phase").classList.toggle("hot", sc === "DROP" || sc === "PREDROP");
+  $("phSub").textContent = sub.join(" · ");
+}
 
 // ---------------------------------------------------------------- now playing
 // The track the show is following, from the decks (deckdash :8080): showbrain's live deck if it's

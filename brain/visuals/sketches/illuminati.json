@@ -1,0 +1,38 @@
+{
+  "title": "Novus Ordo",
+  "about": "The capstone of the Great Seal from the dollar bill, for projecting over a real pyramid: the eye in its triangle, the glory of rays and light, ANNUIT COEPTIS arched above and NOVUS ORDO SECLORUM on the scroll, in the bill's greens. Rays and glow pulse with the kick and burst on the drop; the eye looks round, blinks and opens wide on the drop.",
+  "groups": [
+    {"name": "Layout", "params": [
+      {"id": "size",   "label": "Size",                   "min": 0.3,  "max": 2.5,  "step": 0.01,  "default": 1},
+      {"id": "cy",     "label": "Height",                 "min": -0.4, "max": 0.4,  "step": 0.005, "default": -0.02},
+      {"id": "tri",    "label": "Capstone size",          "min": 0.08, "max": 0.45, "step": 0.005, "default": 0.22}
+    ]},
+    {"name": "Eye", "params": [
+      {"id": "open",   "label": "Open",                   "min": 0,    "max": 1,    "step": 0.01,  "default": 0.75},
+      {"id": "look",   "label": "Look around",            "min": 0,    "max": 1,    "step": 0.01,  "default": 0.5},
+      {"id": "blink",  "label": "Blink (bars)",           "min": 0,    "max": 1,    "step": 0.01,  "default": 0.3}
+    ]},
+    {"name": "Glory", "params": [
+      {"id": "rays",   "label": "Rays",                   "min": 0,    "max": 96,   "step": 2,     "default": 40},
+      {"id": "raylen", "label": "Ray length",             "min": 0.02, "max": 0.8,  "step": 0.01,  "default": 0.3},
+      {"id": "rspin",  "label": "Ray spin",               "min": -2,   "max": 2,    "step": 0.01,  "default": 0.3},
+      {"id": "glow",   "label": "Glow",                   "min": 0,    "max": 1.5,  "step": 0.01,  "default": 0.6},
+      {"id": "beat",   "label": "Beat punch",             "min": 0,    "max": 1,    "step": 0.01,  "default": 0.6},
+      {"id": "drop",   "label": "Burst on the drop",      "min": 0,    "max": 1,    "step": 0.01,  "default": 1}
+    ]},
+    {"name": "Lettering", "params": [
+      {"id": "text",   "label": "Mottos",                 "min": 0,    "max": 1,    "step": 1,     "default": 1},
+      {"id": "tsize",  "label": "Letter size",            "min": 0.02, "max": 0.12, "step": 0.002, "default": 0.06},
+      {"id": "sweep",  "label": "Light along the words",  "min": 0,    "max": 1,    "step": 0.01,  "default": 0.5},
+      {"id": "scroll", "label": "Scroll",                 "min": 0,    "max": 1,    "step": 1,     "default": 1},
+      {"id": "date",   "label": "MDCCLXXVI",              "min": 0,    "max": 1,    "step": 1,     "default": 0},
+      {"id": "ring",   "label": "Seal ring",              "min": 0,    "max": 1,    "step": 1,     "default": 0}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "paper",  "label": "Paper (off: glow on black)", "min": 0, "max": 1,   "step": 0.01,  "default": 1},
+      {"id": "guil",   "label": "Guilloche lines",        "min": 0,    "max": 1,    "step": 0.01,  "default": 0.35},
+      {"id": "hatch",  "label": "Engraving",              "min": 0,    "max": 1,    "step": 0.01,  "default": 0.7},
+      {"id": "follow", "label": "Follow show hue",        "min": 0,    "max": 1,    "step": 1,     "default": 0}
+    ]}
+  ]
+}

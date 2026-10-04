@@ -174,6 +174,29 @@ Launchpad and every other page show the same countdown. It is still on after the
 it was on before. While it is on, **SHUFFLE · THEME · bars left** shows in the strip under the
 preview whichever tab you are on; tap it to get back here.
 
+## Play the knobs
+
+**Play** (on the row under the preview; in Focus it's **Play the knobs**, under Energy) rides the look's
+settings with the song, the way a VJ would, so a look that's up for a while keeps changing. It's on
+unless you switch it off. Tap the button to go Subtle, Lively, Wild, off.
+
+- **The presets are the control points.** Every 8 bars the whole look glides, over two bars from the 1, towards one of the sketch's presets, or back to the values you set. It's never the same one twice running, and every page and projector picks the same one. The amount is how far it goes: Subtle a quarter of the way, Lively half, Wild all the way to the preset. Only the settings it's allowed to move follow (see below), so a preset's choices and speeds stay as you set them. Save a few presets and the knob player tours them.
+- A sketch with no presets wanders instead: every 4 or 8 bars (each setting has its own) some settings glide somewhere new, over a bar from the 1.
+- The ones that make the picture busier (the A / B / C drive amounts, glow, punch, jitter, zoom...)
+  climb through a build, sit at the top on the drop and come down through a breakdown and the intro.
+  The calming ones (fog, background...) go the other way. A sketch says which way with `"energy"`.
+- It stays inside each setting's range (the orange band), so set the band to keep it where you want it.
+- It leaves alone what would jump or break a look: speeds and anything the shader multiplies by the
+  beat or the clock (found in the GLSL), counts, switches and choices, `fixed` and `quality` settings,
+  and any setting with its own automation (**A**) on. A sketch can opt a setting in or out with
+  `"play": true / false` in its json.
+- The settings it has show an outlined marker riding the track. **Space** (Freeze) holds them too.
+- Surfaces with a sketch of their own (Projection) get played as well, not just the Focus.
+
+Like automation it's worked out on every projector from the beat and the show's scene (`playEval` in
+`render.js`), so they all agree. The setting is the visuals service's (`POST /api/auto`
+`{"_play": {"on", "amount"}}`, kept in `state/play.json`).
+
 ## Making things move on their own
 
 Press **A** (or the **A** button on the row) and that parameter starts moving between the two ends

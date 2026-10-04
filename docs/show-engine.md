@@ -122,6 +122,22 @@ IDLE ──track playing──> GROOVE <─────────────�
 
 Outside drops and builds the kick's punch scales with the track's energy in that bar (`drive()` in `looks.py`: 0.8× in the quietest bars, 1.3× in the loudest).
 
+### Interplay: the lights play off each other
+
+Every fixture has a place across the stage, `pos` in its `role` in `config.json`, from -1 (far left, as the crowd sees it) to 1 (far right): pyramid L -1, tube L -0.5, the panel and the par can 0, tube R 0.5, pyramid R 1. Without `pos` it comes from the pyramid's `side` or the tube's place in the strip group, else the middle. A **play** says when each place gets its hit (`hit()` in `looks.py`). Every fixture works out its own kick from the beat, so they stay locked together with nothing sent between them. Left and right are always mirror images, or a call and its answer:
+
+| Play | What it does |
+|---|---|
+| Together | Everything on every beat (how it used to be) |
+| Alternate | Left side on 1 and 3, right side on 2 and 4, the middle on every beat |
+| Call & answer (`swap`) | The left side for the first half of the bar, the right side answers in the second |
+| Bounce | A ball across the stage on the 16ths: left to right in one beat, back in the next |
+| Chase | A sweep across the rig on the 16ths every other beat, the other way each bar |
+| Out | The middle on the beat, out to the ends by the "and" |
+| In | The ends on the beat, in to the middle by the "and" |
+
+The panel's columns each get their own place across its middle stretch (`span`, 0.5 by default), so a bounce or chase travels across it. The auto show picks a play by the track: every 8 bars in the groove (from all of them), from Together, Alternate and Out in the intro and outro, and every 4 bars of a drop after its first bar (Alternate, Bounce, Chase, Out, Call & answer). Builds, breakdowns and the pre-drop keep their own looks. The moving plays (Bounce, Chase, Out, In) use a shorter flash so they read as motion. The Commander's `play` command latches one (`AUTO` hands it back), and the state reports `play` (what's running) and `play_lock`.
+
 Robustness:
 - **Loops**: never drop while looping. Drop when the loop exits and the playhead crosses the drop beat.
 - **Pitch and tempo changes**: schedule in beats, so they're handled automatically.
@@ -145,13 +161,16 @@ Robustness:
 - **Drop control:** DROP NOW, BUILD 2/4/8/16 bars, HOLD, CANCEL BUILD, SKIP NEXT DROP, MARK DROP HERE (saved as a per-track override).
 - **Colour:** AUTO (from the track key), LOCK (tap a swatch), or CYCLE (moves round the wheel every 4 bars).
 - **Motion speed:** ½× (half-time), 1×, 2× (double-time) for the beat-driven looks.
+- **Movement:** how the lights play off each other (see [Interplay](#interplay-the-lights-play-off-each-other)): AUTO, or latch Together, Alternate, Call & answer, Bounce, Chase, Out or In. On Focus's Lights screen.
 - **Fixtures:** on/off and a level fader per fixture, plus master intensity and a latched blackout.
 - **Tap clock:** tap tempo, ±1 BPM, SYNC (downbeat now). It drives latched scenes and DROP/BUILD when no deck is playing, so the lights can still run between sets.
 - **Setup:** AUTO/MANUAL, follow deck (auto / 1 / 2), output latency, RESET ALL OVERRIDES (fixture levels are kept).
 - **Keyboard:** space flash, hold S strobe / W blinder / B blackout, T tap, 0–4 scenes, D drop now.
 - To do: **Smoke: ARM / DISARM**, with the burst length shown and the cooldown remaining.
 
-API: `POST /api/cmd {"cmd": ..., "value": ...}` with `mode`, `follow`, `intensity`, `lead_ms`, `hold`, `strobe`, `strobe_div`, `blinder`, `black_hold`, `flash`, `look`, `palette` (`{"mode", "hue"}`), `speed`, `fixture` (`{"name", "on", "level"}`), `tap`, `tap_bpm`, `tap_sync`, `drop_now`, `build`, `skip_drop`, `mark_drop`, `clear`.
+**Colour from the visuals:** with the palette on `visuals`, the lights take the main colour of the projected picture. The first projector's output page shrinks each frame it has just drawn to 32×18 pixels about every 400 ms. It builds a hue histogram weighted by saturation × brightness, so dark and grey pixels don't count, and posts the strongest hue to the projector service (`/api/colour`). The projector service passes it on to showbrain (`POST /api/visual_colour`, open like `/api/screen`: it only stores the colour). Showbrain glides the lights' hue to it over about half a second, the short way round the colour wheel. Too little colour on screen sends `null`: the lights hold the last colour, then go back to the track's key colour after 5 s without a reading. `visual` in the state shows the latest reading and its age. On the Lighting page it's the **Visuals** colour button; in the Show app, **From the visuals**.
+
+API: `POST /api/cmd {"cmd": ..., "value": ...}` with `mode`, `follow`, `intensity`, `lead_ms`, `hold`, `strobe`, `strobe_div`, `blinder`, `black_hold`, `flash`, `look`, `play` (`AUTO`, `together`, `alternate`, `swap`, `bounce`, `chase`, `out`, `in`), `palette` (`{"mode", "hue"}`; mode `auto` (track key), `lock`, `cycle` or `visuals`), `speed`, `fixture` (`{"name", "on", "level"}`), `tap`, `tap_bpm`, `tap_sync`, `drop_now`, `build`, `skip_drop`, `mark_drop`, `clear`.
 
 ## Dashboard: waveforms and library
 

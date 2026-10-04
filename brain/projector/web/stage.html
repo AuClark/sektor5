@@ -671,7 +671,7 @@ async function mapOnto(fx, p, part) {
   L.surfaces = L.surfaces.filter(s => !old.includes(s)).concat(made);
   delete L.screen; delete L.screens;
   const r = await fetch(`${PROJ}/api/layout`, { method: "POST", body: JSON.stringify(L) });
-  $("mapNote").textContent = r.ok ? `Mapped ${made.length} onto ${part}: ${made.map(s => s.name.slice(prefix.length) + (s.content === "gen" ? ` (${s.sketch || "live sketch"})` : "")).join(", ")}. Fine-tune in Projection, with BACKDROP on.`
+  $("mapNote").textContent = r.ok ? `Mapped ${made.length} onto ${part}: ${made.map(s => s.name.slice(prefix.length) + (s.content === "gen" ? ` (${s.sketch || "Focus"})` : "")).join(", ")}. Fine-tune in Projection, with BACKDROP on.`
     : r.status === 401 ? "Unlock (admin PIN) to map." : `Couldn't save the layout (${r.status}).`;
 }
 

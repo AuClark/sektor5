@@ -5,7 +5,9 @@
 // (0..1, y down), or a triangle given by three (apex, base right, base left: for the faces of a
 // pyramid). Content is drawn per pixel through the inverse homography of that quad, so it lands
 // with correct perspective on angled surfaces; a triangle shows the content's square cropped to
-// the triangle, apex at the top centre (an affine map, exact for a flat face). Masks are black
+// the triangle, apex at the top centre (an affine map, exact for a flat face). A diamond (four corners:
+// top, right, bottom, left; "shape": "diamond") shows the content's square upright and centred, cropped to
+// the diamond: the square's edge midpoints land on its corners. Masks are black
 // polygons drawn on top. All content is beat-locked to the show engine's state.
 // Surfaces can have rounded corners and a border band drawn over their content.
 // Content "gen" is a generative sketch from the visuals service (:8110): the live one (whatever the
@@ -24,17 +26,26 @@ const SCENES = { IDLE: 0, INTRO: 1, GROOVE: 2, BREAKDOWN: 3, BUILD: 4, HOLD: 5, 
 // Updates arrive ~20x/s with network jitter, so the displayed beat doesn't snap to each one:
 // it runs at the track's tempo and eases towards the reported position (at most 10% faster
 // or slower), only jumping on a seek or track change.
+//
+// Timing: showbrain stamps each state (s.t, wall clock) and its beat is already s.lead_ms ahead, for the
+// LEDs' Wi-Fi delay. The page undoes that lead and counts the state's age from the stamp, so `lead`
+// (the layout's lead_ms) is purely this projector's own output delay (GPU, HDMI, the projector's
+// processing): calibrate it with the test card, whose centre flashes on the beat. A page whose clock
+// disagrees with showbrain's by more than a second (another machine without NTP) counts from arrival.
 class ShowClock {
-  constructor() { this.s = null; this.at = 0; this.lead = 60; this.titleVer = 0; this.title = ""; this.b = null; this.last = 0; }
+  constructor() { this.s = null; this.at = 0; this.age = 0; this.sbLead = 0; this.lead = 60; this.titleVer = 0; this.title = ""; this.b = null; this.last = 0; }
   update(s) {
     this.s = s; this.at = performance.now();
+    const age = s && s.t ? Date.now() - s.t * 1000 : NaN;
+    this.age = Number.isFinite(age) && age > -50 && age < 1000 ? Math.max(0, age) : 0;
+    this.sbLead = s && Number.isFinite(s.lead_ms) ? s.lead_ms : 0;
     const t = s && s.title ? s.title : "";
     if (t !== this.title) { this.title = t; this.titleVer++; }
   }
   // Everything the shaders need, extrapolated to "now + lead".
   frame(now) {
     const s = this.s;
-    const dtBeats = s && s.bpm ? ((now - this.at + this.lead) / 1000) * s.bpm / 60 : 0;
+    const dtBeats = s && s.bpm ? ((now - this.at + this.age - this.sbLead + this.lead) / 1000) * s.bpm / 60 : 0;
     if (!s || !s.live || !s.bpm) {
       this.b = null;
       const b = now / 500;                                  // 120 BPM idle clock
@@ -75,6 +86,20 @@ class ShowClock {
 //
 // duty (0..1, default 0.5) is how much of a square's cycle is spent at the top. Down at 0.15 it
 // is a strobe rather than a chop, which is what the Launchpad's STROBE pad wants.
+// Where a surface's picture sits, for what it's showing now ("key": the sketch's name, or a built-in
+// content): the position being adjusted if it was made on this sketch (off_x / off_y / zoom with
+// off_for), else the one kept for this sketch with Set ("fit": {key: [x, y, zoom]}), else centred.
+// So each sketch keeps its own place on a surface, and a change of sketch never carries one over.
+function fitOf(s, key) {
+  if (s.off_for === key) return [s.off_x || 0, s.off_y || 0, s.zoom || 1];
+  const f = s.fit && s.fit[key];
+  return f ? [f[0] || 0, f[1] || 0, f[2] || 1] : [0, 0, 1];
+}
+const fitKey = (s, liveName) => s.content === "gen" ? s.sketch || liveName || "" : s.content;
+
+// What the renderer keeps of a setting's schema: enough to clamp it, automate it and play it.
+const specOf = (p, timed) => ({ id: p.id, label: p.label || "", min: p.min, max: p.max, step: p.step, kind: p.kind || "",
+                                energy: p.energy, play: p.play, timed: !!(timed && timed.has(p.id)) });
 function autoHash(n) { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
 function autoEval(a, beat, inBar, time) {
   const t = (a.hz ? time : (a.retrig ? inBar : beat)) * (a.rate || 0) + (a.phase || 0);
@@ -91,6 +116,75 @@ function autoEval(a, beat, inBar, time) {
   }
   const lo = a.lo, hi = a.hi;
   return lo + (hi - lo) * v;
+}
+
+// ---------------------------------------------------------------- the knob player
+// With Play on (the visuals service's "play", on unless switched off) the renderer rides a
+// sketch's knobs with the song, on top of the values it holds, the way a VJ would. Every 4 or 8
+// bars some of them glide somewhere new, over a bar from the 1. The ones that make the picture
+// busier lean up through a build, sit at the top on the drop and come down through a breakdown;
+// the calming ones go the other way. It works from the beat and the show's scene alone, so every
+// surface and projector moves the same, it costs nothing on the network, and it never leaves a
+// knob's range (the orange band on the Visuals page). It leaves alone what would jump or break a
+// look: speeds and counts (a sketch works position out from beat x speed, so a new speed leaps),
+// switches and choices, "fixed" and "quality" settings, and a knob with its own automation on.
+// A sketch can opt a setting in or out with "play": true / false in its json.
+// A sketch with presets uses them as the control points: every 8 bars the whole look glides (over two
+// bars, from the 1) towards one of its presets, or back to the values you set, never the same one
+// twice running; how far it goes is the amount (Wild arrives). Without presets each setting wanders.
+const PLAY_BUSY = new Set(["aamt", "bamt", "camt", "bounce", "dance", "noodle", "boil", "film", "glow",
+  "jitter", "twist", "zoom", "patscale", "detail", "density", "beat", "punch", "kal", "rosette", "burst",
+  "lines", "glitch", "rays", "surge", "lurch", "edge", "ember", "sparks", "amp", "warp", "bright"]);
+const PLAY_CALM = new Set(["fog", "bg", "swap", "far", "day", "climb"]);
+const PLAY_NOT = /speed|spd|spin|rate|drift|orbit|cycle|run\b|beats|count|steps|seed|style|mode|layout|sides|octave|per beat|per bar/i;
+function playable(p) {
+  if (!p || p.play === false) return false;
+  if (p.play === true) return true;
+  if (p.timed || p.kind === "rate" || p.kind === "quality" || p.kind === "fixed" || p.id === "follow" || !(p.max > p.min)) return false;
+  if (p.step && (p.step >= 1 || (p.max - p.min) / p.step < 20)) return false;      // switches, choices, counts
+  return !PLAY_NOT.test(p.id) && !PLAY_NOT.test(p.label || "");
+}
+// The settings a shader multiplies by the beat or the clock ("u_beat * p_scroll", "time * p_rot"): speeds by
+// another name, which leap when they change. Read out of the GLSL, so a new sketch is covered too.
+function timedIds(glsl, ids) {
+  const T = "(?:u_beat|u_time|time|beat|bb|tb|t)";
+  return new Set(ids.filter(id => new RegExp(`\\bp_${id}\\s*\\*\\s*${T}\\b|\\b${T}\\s*\\*\\s*p_${id}\\b`).test(glsl || "")));
+}
+const playDir = p => p.energy !== undefined ? p.energy : PLAY_BUSY.has(p.id) ? 1 : PLAY_CALM.has(p.id) ? -1 : 0;
+function playHash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return (h >>> 0) / 4294967296; }
+
+// Where the song wants the busy knobs: -1 (deep in a breakdown) .. 1 (the drop).
+function songPush(f) {
+  switch (f.scene) {
+    case SCENES.DROP: return 1 - 0.5 * Math.min(1, (f.since || 0) / 64);
+    case SCENES.PREDROP: return 0.85;
+    case SCENES.BUILD: case SCENES.HOLD: return -0.3 + 1.1 * (f.progress || 0);
+    case SCENES.BREAKDOWN: return -0.6 - 0.2 * (1 - (f.sp || 0));
+    case SCENES.INTRO: case SCENES.OUTRO: return -0.45;
+    case SCENES.GROOVE: return 0.9 * ((f.energy ?? 0.5) - 0.5);
+    default: return -0.3;
+  }
+}
+
+// The control point for phrase n (8 bars), the same on every page: -1 = the held values, else a preset.
+function playPoint(name, n, count) {
+  const raw = m => Math.floor(autoHash(playHash(name) * 131 + m) * (count + 1)) - 1;
+  const a = raw(n);
+  return a === raw(n - 1) ? ((a + 2) % (count + 1)) - 1 : a;   // never the same one twice running
+}
+
+// One knob's value: its held value, moved by the phrase and the song. bb is the beat counted
+// from a downbeat (multiples of 4 are the 1s); push is songPush, smoothed; amount 0..1.
+function playEval(p, key, base, lo, hi, bb, push, amount) {
+  const seed = playHash(key);
+  const per = seed < 0.5 ? 16 : 32;                                  // this knob moves every 4 or every 8 bars
+  const k = Math.floor(bb / per), x = (bb - k * per) / 4;            // bars into its phrase
+  const tgt = n => 2 * autoHash(seed * 977 + n) - 1;
+  const g = Math.min(1, Math.max(0, x)), u = g * g * (3 - 2 * g);    // the glide, over the phrase's first bar
+  const w = tgt(k - 1) + (tgt(k) - tgt(k - 1)) * u;
+  const dir = playDir(p), span = hi - lo;
+  const off = amount * span * (dir ? 0.2 * w + 0.3 * dir * push : 0.3 * w);   // Wild: up to half the range
+  return Math.max(lo, Math.min(hi, base + off));
 }
 
 // ---------------------------------------------------------------- homography
@@ -117,7 +211,18 @@ function squareToTri(c) {
   const fx = 0.5 * ex - (a[0] - l[0]), fy = 0.5 * ey - (a[1] - l[1]);   // (0, 1)
   return [ex, fx, l[0] - fx, ey, fy, l[1] - fy, 0, 0, 1];
 }
-const surfaceMatrix = c => c.length === 3 ? squareToTri(c) : squareToQuad(c);
+// A diamond: the content square's edge midpoints (0.5, 0), (1, 0.5), (0.5, 1), (0, 0.5) -> its top, right,
+// bottom and left corners (a homography, so it keeps perspective on an angled face).
+const DIAMOND_IN_SQUARE = invert3Lazy();
+function invert3Lazy() { let m = null; return () => m || (m = invert3(squareToQuad([[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]]))); }
+function mul3(a, b) {
+  const o = new Array(9);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+  return o;
+}
+const squareToDiamond = c => mul3(squareToQuad(c), DIAMOND_IN_SQUARE());
+const isDiamond = s => s.shape === "diamond" && s.corners.length === 4;
+const surfaceMatrix = (c, shape) => c.length === 3 ? squareToTri(c) : shape === "diamond" ? squareToDiamond(c) : squareToQuad(c);
 
 function invert3(m) {
   const [a, b, c, d, e, f, g, h, i] = m;
@@ -131,9 +236,10 @@ function invert3(m) {
 // Row-major 3x3 -> column-major Float32Array for uniformMatrix3fv.
 const colMajor = m => new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]);
 
-function quadSize(c, W, H) {
+function quadSize(c, W, H, shape) {
   const d = (p, q) => Math.hypot((p[0] - q[0]) * W, (p[1] - q[1]) * H);
   if (c.length === 3) return [d(c[1], c[2]), d(c[0], [(c[1][0] + c[2][0]) / 2, (c[1][1] + c[2][1]) / 2])];   // base, height
+  if (shape === "diamond") return [d(c[3], c[1]), d(c[0], c[2])];                                             // the diagonals
   return [(d(c[0], c[1]) + d(c[3], c[2])) / 2, (d(c[0], c[3]) + d(c[1], c[2])) / 2];
 }
 function quadAspect(c, W, H) {
@@ -161,6 +267,9 @@ uniform float u_todrop, u_cbeat;
 uniform float u_opacity, u_bright, u_sel, u_time;
 uniform float u_radius, u_border, u_bbright, u_bsat, u_bpulse;
 uniform float u_tri;   // 1: a triangle surface (apex at the top centre of the square)
+uniform float u_dia;   // 1: a diamond surface (the square's edge midpoints on its corners)
+uniform vec2 u_off;    // where the picture sits in its surface: + moves it right / down, in surface widths / heights
+uniform float u_zoom;  // how big the picture is in its surface, about the surface's centre: 1 = as made, 2 = twice
 uniform float u_px;   // one output pixel in surface units (surface height = 1), for anti-aliasing
 uniform sampler2D u_tex;
 // The live track's waveform, resampled per beat by the visuals service (trackwave.py).
@@ -356,8 +465,13 @@ void main() {
     sd = max(sd, (abs(sp.x) - 0.5 * u_aspect * (sp.y + 0.5)) / sqrt(1.0 + 0.25 * u_aspect * u_aspect));
     if (sd > 2.0 * u_px) discard;
   }
+  if (u_dia > 0.5) {           // inside the diamond: |x| / (w/2) + |y| / (h/2) <= 1, distance in the same units
+    vec2 dn = vec2(2.0 / u_aspect, 2.0);
+    sd = max(sd, (dot(abs(sp), dn) - 1.0) / length(dn));
+    if (sd > 2.0 * u_px) discard;
+  }
   float a = smoothstep(0.0, 1.5 * u_px, -sd) * u_opacity;
-  vec2 cuv = u_trole > 0.5 ? s5t_uv(uv) : uv;
+  vec2 cuv = ((u_trole > 0.5 ? s5t_uv(uv) : uv) - 0.5 - u_off) / max(u_zoom, 0.05) + 0.5;   // the shape stays put; the picture moves and scales in it
   vec3 c = content(cuv) * u_bright;
   if (u_trole > 0.5 && u_trole < 1.5) {        // incoming: masked, with the transition's edge light
     vec3 g = vec3(0.0);
@@ -450,6 +564,8 @@ const CONTENT = {
   }`,
 };
 // Test card: grid, border, diagonals, centre circle, coloured corners (no derivative extension needed).
+// The centre flashes on every beat (red on the one) for an eighth of a beat (~60 ms): line it up with the kick by ear, or film
+// it next to a deck in slow motion, with the editor's latency slider.
 CONTENT.test = `vec3 content(vec2 uv) {
   vec2 g = abs(fract(uv * 10.0 + 0.5) - 0.5) * 10.0;
   float grid = step(min(g.x * u_aspect, g.y), 0.02);
@@ -458,6 +574,8 @@ CONTENT.test = `vec3 content(vec2 uv) {
   vec2 cp = (uv - 0.5) * vec2(u_aspect, 1.0);
   float circle = step(abs(length(cp) - 0.4), 0.004);
   vec3 c = vec3(0.35) * grid + vec3(1.0) * clamp(border + circle + diag * 0.6, 0.0, 1.0);
+  float flash = step(u_frac, 0.12) * step(length(cp), 0.4);                // the first eighth of the beat (~60 ms)
+  if (flash > 0.5) c = u_bwb < 1.5 ? vec3(1.0, 0.1, 0.1) : vec3(1.0);
   float m = 0.12;
   if (uv.x < m / u_aspect && uv.y < m) c = vec3(1.0, 0.0, 0.0);
   if (uv.x > 1.0 - m / u_aspect && uv.y < m) c = vec3(0.0, 1.0, 0.0);
@@ -490,6 +608,8 @@ class MapRenderer {
     this.genSpec = {};        // id -> {min, max, step, kind} out of the sketch's schema
     this.genLive = {};        // what the shader actually gets: genParams with automation applied
     this.genFreeze = false;   // hold every automated value where it is (the page's Freeze)
+    this.genPlay = { on: true, amount: 0.5 };   // the knob player (see playEval), from the visuals service
+    this._push = null;        // songPush, smoothed so a new section leans in rather than jumps
     this._frz = null;
     this.lastFrame = null;    // the clock frame this draw used, for pages that want to read it
     this.genError = null;
@@ -559,9 +679,9 @@ class MapRenderer {
     this.liveSketch = sk.name;
     try {
       const ids = sk.groups.flatMap(g => g.params.map(p => p.id));
-      const spec = {};
+      const spec = {}, timed = timedIds(sk.glsl, ids);
       for (const g of sk.groups) for (const p of g.params)
-        spec[p.id] = { min: p.min, max: p.max, step: p.step, kind: p.kind || "" };
+        spec[p.id] = specOf(p, timed);
       const prog = this._program(COMMON + sk.glsl, ids.map(id => "p_" + id));
       prog.ids = ids; prog.name = sk.name; prog.climax = sk.climax || null;
       if (trans && this.progs.gen) this._beginTrans(trans);          // before genSpec changes: the outgoing keeps its own
@@ -622,13 +742,18 @@ class MapRenderer {
 
   // What a "gen" surface draws: the live sketch, or its own one (loaded on first use; nothing until then).
   // The live one gets genLive -- the held values with this frame's automation on top. A surface
-  // pinned to its own sketch gets the plain values it was fetched with: automation belongs to the
-  // sketch the Visuals page is driving, and there is only one set of it.
+  // pinned to its own sketch gets the values it was fetched with, ridden by the knob player (its
+  // automation belongs to the sketch the Visuals page is driving, and there is only one set of it).
   sketchFor(s) {
     if (!s.sketch || s.sketch === this.liveSketch) return this.progs.gen ? { prog: this.progs.gen, values: this.genLive } : null;
     const key = s.sketch + "|" + (s.preset || ""), e = this.sketches[key];
     if (!e) this._loadSketch(s.sketch, s.preset, key);
-    return e && e.prog ? e : null;
+    if (!e || !e.prog) return null;
+    if (e.frame !== this._frameNo) {                    // once a frame, however many surfaces show it
+      e.frame = this._frameNo;
+      if (this.lastFrame) this._automate(e.live, e.values, {}, e.spec, this.lastFrame, this._now, e.prog.name);
+    }
+    return { prog: e.prog, values: e.live };
   }
 
   async _loadSketch(name, preset, key) {
@@ -641,7 +766,9 @@ class MapRenderer {
       const ids = sk.groups.flatMap(g => g.params.map(p => p.id));
       const prog = this._program(COMMON + sk.glsl, ids.map(id => "p_" + id));
       prog.ids = ids; prog.name = sk.name; prog.climax = sk.climax || null;
-      this.sketches[key] = { prog, values };
+      const spec = {}, timed = timedIds(sk.glsl, ids);
+      for (const g of sk.groups) for (const p of g.params) spec[p.id] = specOf(p, timed);
+      this.sketches[key] = { prog, values, spec, live: { ...values } };
     } catch (e) {
       console.error("sketch", name, e);
       this.sketches[key] = { error: String(e) };
@@ -663,7 +790,7 @@ class MapRenderer {
     const u = {};
     for (const n of ["u_res", "u_Hinv", "u_aspect", "u_beat", "u_frac", "u_bwb", "u_bar", "u_hue", "u_scene", "u_progress",
                      "u_since", "u_energy", "u_sp", "u_opacity", "u_bright", "u_sel", "u_time", "u_tex",
-                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri",
+                     "u_radius", "u_border", "u_bbright", "u_bsat", "u_bpulse", "u_px", "u_box", "u_tri", "u_dia", "u_off", "u_zoom",
                      "u_wave", "u_wv", "u_wloop", "u_text", "u_textn", "u_trole", "u_tp", "u_tmode", "u_tseed", "u_tdur", "u_todrop", "u_cbeat", ...extra])
       u[n] = gl.getUniformLocation(p, n);
     return { p, u, a: gl.getAttribLocation(p, "a") };
@@ -707,7 +834,7 @@ class MapRenderer {
     if (!L) return;
     this.clock.lead = L.lead_ms ?? 60;
     const f = this.clock.frame(now);
-    this.lastFrame = f;
+    this.lastFrame = f; this._now = now; this._frameNo = (this._frameNo || 0) + 1;
     this._genFrame(f, now);
     this._updateTitle();
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -807,11 +934,14 @@ class MapRenderer {
     gl.vertexAttribPointer(pr.a, 2, gl.FLOAT, false, 0, 0);
     const u = pr.u;
     gl.uniform2f(u.u_res, W, H);
-    gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners))));
+    gl.uniformMatrix3fv(u.u_Hinv, false, colMajor(invert3(surfaceMatrix(s.corners, s.shape))));
     gl.uniform1f(u.u_tri, s.corners.length === 3 ? 1 : 0);
+    const fit = fitOf(s, pr.name || s.content);   // a gen program knows its sketch (the outgoing one too, in a transition)
+    gl.uniform2f(u.u_off, fit[0], fit[1]); gl.uniform1f(u.u_zoom, fit[2]);
+    gl.uniform1f(u.u_dia, isDiamond(s) ? 1 : 0);
     const xs = s.corners.map(c => c[0]), ys = s.corners.map(c => c[1]);
     gl.uniform4f(u.u_box, 2 * Math.min(...xs) - 1, 1 - 2 * Math.max(...ys), 2 * Math.max(...xs) - 1, 1 - 2 * Math.min(...ys));
-    const [qw, qh] = quadSize(s.corners, W, H);
+    const [qw, qh] = quadSize(s.corners, W, H, isDiamond(s) ? "diamond" : null);
     gl.uniform1f(u.u_aspect, qh > 1 ? qw / qh : 1);
     gl.uniform1f(u.u_px, 1 / Math.max(qh, 1));
     gl.uniform1f(u.u_beat, f.beat); gl.uniform1f(u.u_frac, f.frac); gl.uniform1f(u.u_bwb, f.bwb);
@@ -849,12 +979,19 @@ class MapRenderer {
   // The live parameter values for this frame: the held values, with automation moved on top.
   // Once per frame and shared by every surface, so a layout with six of them costs the same.
   _genFrame(f, now) {
-    this._automate(this.genLive, this.genParams, this.genAuto, this.genSpec, f, now);
+    // The song's push on the knobs, eased over about 2 beats; the drop lands at once. Freeze holds it.
+    const want = songPush(f), P = this._push;
+    if (!this.genFreeze) {
+      const dt = P ? f.beat - P.beat : -1;
+      if (!P || dt < 0 || dt > 16 || (f.scene === SCENES.DROP && f.since < 0.5)) this._push = { v: want, beat: f.beat };
+      else { P.v += (want - P.v) * (1 - Math.exp(-dt / 2)); P.beat = f.beat; }
+    }
+    this._automate(this.genLive, this.genParams, this.genAuto, this.genSpec, f, now, this.liveSketch);
     const T = this.trans;
-    if (T) this._automate(T.out.live, T.out.params, T.out.auto, T.out.spec, f, now);
+    if (T) this._automate(T.out.live, T.out.params, T.out.auto, T.out.spec, f, now, T.out.prog && T.out.prog.name);
   }
 
-  _automate(live, params, A, S, f, now) {
+  _automate(live, params, A, S, f, now, name = "") {
     for (const id in params) live[id] = params[id];
     // The beat counter shifted so downbeats are multiples of 4, same as barBeat() in the
     // shaders, so "retrigger on bar" fires on the 1 and not wherever the track happened to start.
@@ -875,6 +1012,38 @@ class MapRenderer {
       if (s) v = Math.max(s.min, Math.min(s.max, v));    // never outside what the sketch allows
       live[id] = v;
     }
+    const pl = this.genPlay;
+    if (!pl || !pl.on || !(pl.amount > 0)) return;
+    const pb = F ? F.beat - (f.beat - bb) : bb, push = this._push ? this._push.v : 0;
+    // With presets: the phrase's control point (and the one it's leaving), glided over two bars from the 1.
+    const pts = this._playPoints(name), n = Math.floor(pb / 32), g = Math.min(1, Math.max(0, (pb - 32 * n) / 8));
+    const from = pts.length ? playPoint(name, n - 1, pts.length) : 0, to = pts.length ? playPoint(name, n, pts.length) : 0;
+    const u = g * g * (3 - 2 * g);
+    for (const id in params) {
+      const s = S[id], a = A[id];
+      if (!s || (a && a.on) || !playable(s)) continue;
+      const lo = a ? Math.max(s.min, a.lo) : s.min, hi = a ? Math.min(s.max, a.hi) : s.max;
+      if (!(hi > lo)) continue;
+      if (!pts.length) { live[id] = playEval(s, name + "|" + id, params[id], lo, hi, pb, push, pl.amount); continue; }
+      const base = params[id], at = i => i < 0 ? base : pts[i][id] ?? base;
+      const tgt = at(from) + (at(to) - at(from)) * u;
+      live[id] = Math.max(lo, Math.min(hi, base + pl.amount * (tgt - base) + pl.amount * (hi - lo) * 0.3 * playDir(s) * push));
+    }
+  }
+
+  // The presets of a sketch, as the knob player's control points (fetched once, refreshed every minute).
+  _playPoints(name) {
+    if (!name) return [];
+    this._pp = this._pp || {};
+    const e = this._pp[name], now = performance.now();
+    if (!e || (!e.loading && now - e.at > 60000)) {
+      const keep = e ? e.pts : [];
+      this._pp[name] = { pts: keep, at: now, loading: true };
+      fetch(`${visualsBase()}/api/presets?sketch=${encodeURIComponent(name)}&values=1`).then(r => r.ok ? r.json() : null)
+        .then(j => { this._pp[name] = { pts: j && j.values ? Object.values(j.values) : keep, at: performance.now() }; })
+        .catch(() => { this._pp[name] = { pts: keep, at: performance.now() }; });
+    }
+    return this._pp[name].pts;
   }
 
   drawHandles(opts = {}) {
@@ -897,7 +1066,7 @@ class MapRenderer {
       });
       const k = s.corners.length, cx = s.corners.reduce((a, c) => a + c[0], 0) / k * W, cy = s.corners.reduce((a, c) => a + c[1], 0) / k * H;
       o.fillStyle = sel ? "#2fe6ff" : "#fff"; o.textAlign = "center";
-      o.fillText(`${s.name || s.id} · ${s.content === "gen" && s.sketch ? s.sketch + (s.preset ? " · " + s.preset : "") : s.content}`, cx, cy);
+      o.fillText(`${s.name || s.id} · ${s.content !== "gen" ? s.content : s.sketch ? s.sketch + (s.preset ? " · " + s.preset : "") : "focus"}`, cx, cy);
     }
     for (const m of L.masks) {
       if (!mine(m)) continue;
@@ -980,6 +1149,7 @@ function connectEvents(renderer, { onLayout, onScreen, onScreens, onStatus, onSk
       else if (m.t === "auto") {
         renderer.genAuto = m.auto || {};
         renderer.genFreeze = !!m.freeze;
+        if (m.play) renderer.genPlay = m.play;
         onAuto && onAuto(renderer.genAuto, renderer.genFreeze);
       }
       else if (m.t === "wave") renderer.setWave(m.wave);
