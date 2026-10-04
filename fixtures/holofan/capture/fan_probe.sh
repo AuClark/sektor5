@@ -38,7 +38,7 @@ cleanup_home() {
 }
 trap 'echo; note "stopped early: rejoining home first"; cleanup_home; exit 1' INT TERM
 
-echo "Fan probe: $STEPS steps, about 3-5 minutes. The Mac is off the internet until step 7 finishes."
+echo "Fan probe: $STEPS steps, about 5 minutes at most. The Mac is off the internet until step 7 finishes."
 sudo -n true 2>/dev/null && SUDO="sudo -n" || { SUDO=""; echo "(no sudo: the traffic capture and UDP scan will be skipped; run 'sudo -v' first to include them)"; }
 
 step 1 "Joining the fan's Wi-Fi ($FAN_SSID)"
@@ -63,8 +63,12 @@ if [ -n "$SUDO" ]; then
   tcpdump -n -r "$HOME/fan-probe.pcap" "src host $FAN and not icmp and not arp" 2>/dev/null | head -20 | sed 's/^/   /'
 else note "skipped (needs sudo)"; fi
 
-step 3 "Scanning all 65,535 TCP ports on the fan (what it listens on)"
-nmap -Pn -p- -T4 --min-rate 2000 --max-retries 1 -sT --stats-every 10s -oN "$HOME/fan-ports.txt" $FAN 2>&1 | nmap_progress
+step 3 "Scanning the 1,000 most common TCP ports plus the usual ESP32 ones (what the fan listens on)"
+# The fan ignores closed ports instead of refusing them, so every miss is a timeout: keep the list short
+# and the waits small (it's one Wi-Fi hop away). ESP32 extras: 3232 ArduinoOTA, 8266, 6666 app, 23 telnet...
+ESP_PORTS="21,22,23,53,80,81,443,554,1883,2323,3232,5000,5555,6666,6667,7777,8000,8080,8081,8088,8266,8443,8888,8988,9000,9999,23456,50000"
+nmap -Pn -sT --top-ports 1000 -p "T:$ESP_PORTS" -T4 --max-retries 0 --initial-rtt-timeout 80ms --max-rtt-timeout 250ms \
+     --host-timeout 4m --stats-every 10s -oN "$HOME/fan-ports.txt" $FAN 2>&1 | nmap_progress
 OPEN=$(grep -E "^[0-9]+/tcp +open" "$HOME/fan-ports.txt" | cut -d/ -f1 | paste -sd, -)
 note "open TCP ports: ${OPEN:-none}"
 
@@ -73,7 +77,7 @@ if [ -n "$OPEN" ]; then nmap -Pn -sT -sV -p "$OPEN" --stats-every 10s $FAN 2>&1 
 else note "nothing open to identify"; fi
 
 step 5 "Scanning the 50 most common UDP ports"
-if [ -n "$SUDO" ]; then $SUDO nmap -Pn -sU --top-ports 50 -T4 --stats-every 10s $FAN 2>&1 | nmap_progress
+if [ -n "$SUDO" ]; then $SUDO nmap -Pn -sU --top-ports 50 -p "U:8988,6666,5353,1900" -T4 --max-retries 1 --host-timeout 3m --stats-every 10s $FAN 2>&1 | nmap_progress
 else note "skipped (needs sudo)"; fi
 
 step 6 "Asking any web-looking ports for a page"
