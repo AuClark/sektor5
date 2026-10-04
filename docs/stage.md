@@ -52,12 +52,20 @@ The simulated lasers play full laser shows, locked to the show's beat clock and 
   - **Sunburst:** spokes bursting out once a bar.
   - **Zigzag lattice:** beams crossing into a diamond mesh.
   - **Converge:** a fan closing to a point, used in builds.
-- **When cues change:** every 8 bars, or every 4 in a drop, so the show follows the track's phrasing.
-- **Mirroring:** every laser in the rig takes part. Left and right mirror each other.
-- **Sections:**
-  - **Builds** narrow, spin faster and stutter at ¼, then ⅛, then 1/16 as they rise.
-  - **Drops** open after the white hit. The 4th bar of each drop phrase stutters.
-  - The **pre-drop blackout** cuts them.
+  - From laser-show history (styles, not anyone's show data): **Lissajous** figures (Laserium at the Griffith Observatory, 1973), **spirograph roses** (the Laserium abstracts), the **laser harp** (Jean-Michel Jarre, from 1981: upright beams plucked in a melody), the **pyramid** (Pink Floyd's 1994 tour, Daft Punk's 2006 Alive), the **searchlight** (Led Zeppelin 1977, The Who 1975: one or two fat beams in slow arcs), the **helix** (90s rave tunnels: two cones turning against each other), the **grid** (Kraftwerk-style lattices), the **shutter fan** (each beam chopped on its own 16ths), the **starfield**, the **crown** (a halo of beams straight up) and **rise** (a fan lifting from the floor to the sky, for builds).
+- **The director: no two drops or builds the same.** The look sets the palette and which cues it favours; the director composes a program for every drop, build and 8-bar phrase as it starts (`compose()` in `lasershow.js`):
+  - **Cues:** one main cue, or a main cue with a lighter layer under it (a liquid sky, a Lissajous, a starfield...), with its own beam count, speed and shape. Beam counts follow the track's energy.
+  - **Gate:** how it's chopped: none, a pulse, ¼, ⅛, 1/16, off-beats, triplets, gallop or a 3-3-2 tresillo; breakdowns and intros only swell or pulse.
+  - **Mask:** which beams are lit: all, odd and even trading beats, a wipe across the fan, from the middle out, random, or thirds.
+  - **Colour:** the look's own, one colour, each side its own, a gradient across the fan, three colours a step a beat, white on every downbeat, or ice-white accents. Never yellow (`noYellow()`, as on the lights).
+  - **Motion:** the sides mirrored, in parallel (both the same way), or in canon (the right answers the left 2 beats later); half, normal or double speed.
+  - **Fills** in the last 2 beats of a phrase: a stutter roll, a snap to black, a lift to the sky, a freeze, or a reverse spin.
+  - **Drops:** 4 phrases of 4 bars, each different, after an opener in the first bar (a sunburst, a fan slamming open, a curtain, a shatter, a crown or a pyramid). Later drops in a track get more beams and more layers; the last drop is a finale.
+  - **Builds:** a style (converge, rise, spin-up, harp roll, count-in, pyramid, lift, helix or crown) with its own stutter curve (doubling, triplets, late, ramp or none), optionally whitening and adding a layer in its second half.
+  - **Memory:** it scores a few candidate programs against the last ten and keeps the least familiar, and each time a track starts it draws a new random salt, so the same track gets a different show next time (and **Auto** may pick a different look).
+- **Mirroring:** every laser in the rig takes part; both share each program, so they stay locked together.
+- **The pre-drop blackout** cuts them, and the drop's white hit belongs to the strobe.
+- **Leg-pyramid lasers** (the real on/off red ones): held for a drop's first bar, then a new rhythm each 4-bar phrase (kick, the one, off-beats, gallop, triplets, tresillo, bars or 8ths), never the same twice running. `pyramid_laser()` in `looks.py` does this on the brain and `pyramidLaserOn()` in `lasershow.js` in the Stage view, with the same numbers, so they match.
 - **Physical behaviour:** beams stop at the floor, and **HAZE** sets how visible they are.
 - **Section preview:** the second LASERS menu makes the lasers play one section (GROOVE, BUILD, DROP, BREAKDOWN or INTRO) on the show's clock, or at 128 BPM when no deck is playing. It's for designing and only affects your view. **FOLLOW SHOW** returns to normal.
 - **Laser fixtures:** add more with **Add fixture → Laser** and place them on the truss or the stage front for a fuller field. Each fixture draws up to 72 beams plus a sheet.

@@ -135,8 +135,19 @@ Every fixture has a place across the stage, `pos` in its `role` in `config.json`
 | Chase | A sweep across the rig on the 16ths every other beat, the other way each bar |
 | Out | The middle on the beat, out to the ends by the "and" |
 | In | The ends on the beat, in to the middle by the "and" |
+| Zigzag | Side to side on the 16ths: left end, right end, left inner, right inner, the middle, then back out |
+| Cross | The diagonals trade 8ths (left end with right inner, then right end with left inner), the middle answering on the 16ths between |
+| Stack | Builds out across the bar: the middle from beat 1, the inner pair joins on 2, the ends on 3 |
+| Wave | A soft hump rolling across the stage, left to right over 2 beats and back over the next 2 (not kick-locked) |
+| Sparkle | Random places on the 16ths; every fixture works out the same "random" from the 16th and its place, so they agree |
 
-The panel's columns each get their own place across its middle stretch (`span`, 0.5 by default), so a bounce or chase travels across it. The auto show picks a play by the track: every 8 bars in the groove (from all of them), from Together, Alternate and Out in the intro and outro, and every 4 bars of a drop after its first bar (Alternate, Bounce, Chase, Out, Call & answer). Builds, breakdowns and the pre-drop keep their own looks. The moving plays (Bounce, Chase, Out, In) use a shorter flash so they read as motion. The Commander's `play` command latches one (`AUTO` hands it back), and the state reports `play` (what's running) and `play_lock`.
+The panel's columns each get their own place across its middle stretch (`span`, 0.5 by default), so a bounce or chase travels across it. The auto show picks a play by the track: every 8 bars in the groove (from all of them), from Together, Alternate, Out, Wave and Stack in the intro and outro, and every 4 bars of a drop after its first bar (Alternate, Bounce, Chase, Out, Call & answer, Zigzag, Cross, Sparkle). Builds, breakdowns and the pre-drop keep their own looks. The moving plays (Bounce, Chase, Out, In, Zigzag, Cross, Sparkle) use a shorter flash so they read as motion. The Commander's `play` command latches one (`AUTO` hands it back), and the state reports `play` (what's running) and `play_lock`.
+
+### Layered colour, and no yellow
+
+The lights use three colours at once rather than one and its opposite (`palette()` and `layer()` in `looks.py`). The track's hue (from its key, the visuals or a locked swatch) is joined by two more, from a scheme picked by the track and changed every 32 bars: triad, split complement, a neighbour plus the opposite, analogous, or a quarter round plus the opposite. `layer()` lays the three across the stage (left to right) and up each fixture (tube height, pyramid leg, panel row), holding each colour a while before blending into the next and drifting a step every 8 bars. Grooves, intros and outros are gradients across the rig; in drops the colour blocks, the per-bar flips and the 16th-note peak step through all three colours instead of two.
+
+**No yellow:** every colour goes through `hsv()`, which squeezes the hues from red-orange to green so they skip amber, yellow and chartreuse (34-90°, `YELLOW`); colours outside that range are unchanged. Two colours blended in RGB can still make yellow (a red base under a green comet), so each fixture's frame also passes through `unyellow()`, which turns any clearly yellow pixel to orange or green, whichever is nearer. The Commander has no yellow swatch.
 
 Robustness:
 - **Loops**: never drop while looping. Drop when the loop exits and the playhead crosses the drop beat.

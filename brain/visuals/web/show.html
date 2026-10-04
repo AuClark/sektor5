@@ -125,6 +125,7 @@
   .seg button { height: var(--h); border-radius: 9px; font-weight: 500; font-size: 14px; color: var(--dim); transition: background .12s, color .12s; }
   .seg button:hover { color: var(--text); background: var(--muted); }
   .seg button.on { background: var(--text); color: var(--on); }
+  #plays { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }   /* 13 movements: wrap */
   #plays { grid-auto-flow: row; grid-template-columns: repeat(8, minmax(0, 1fr)); }
   @media (max-width: 760px) { #plays { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
@@ -585,6 +586,8 @@
       <button data-play="AUTO">Auto</button><button data-play="together">Together</button><button data-play="alternate" title="Left on 1 and 3, right on 2 and 4">Alternate</button>
       <button data-play="swap" title="Left side for half a bar, then the right answers">Call &amp; answer</button><button data-play="bounce" title="A ball across the stage and back, on the 16ths">Bounce</button>
       <button data-play="chase" title="A sweep across the rig, the other way each bar">Chase</button><button data-play="out" title="From the middle out to the ends">Out</button><button data-play="in" title="From the ends in to the middle">In</button>
+      <button data-play="zigzag" title="Side to side on the 16ths, from the ends in to the middle and back">Zigzag</button><button data-play="cross" title="The diagonals trade 8ths, the middle answers between">Cross</button><button data-play="stack" title="Builds out across the bar: the middle, then the inner pair, then the ends">Stack</button>
+      <button data-play="wave" title="A soft wave rolling across the stage and back">Wave</button><button data-play="sparkle" title="Random places on the 16ths">Sparkle</button>
     </div>
     <div class="desk-2">
       <div>
@@ -853,7 +856,8 @@ function renderPilot() {
 
 const NICE = { IDLE: "Waiting", INTRO: "Ambient", GROOVE: "Groove", BUILD: "Building", HOLD: "Holding", PREDROP: "Here it comes", DROP: "Drop", BREAKDOWN: "Break", OUTRO: "Outro" };
 const nice = s => NICE[s] || (s ? s[0] + s.slice(1).toLowerCase() : "—");
-const PLAY_NAME = { together: "Together", alternate: "Alternate", swap: "Call & answer", bounce: "Bounce", chase: "Chase", out: "Out", in: "In" };
+const PLAY_NAME = { together: "Together", alternate: "Alternate", swap: "Call & answer", bounce: "Bounce", chase: "Chase", out: "Out", in: "In",
+                    zigzag: "Zigzag", cross: "Cross", stack: "Stack", wave: "Wave", sparkle: "Sparkle" };
 let strips = "";
 function renderLights() {
   on("[data-look]", b => (S.look || "AUTO") === b.dataset.look);
