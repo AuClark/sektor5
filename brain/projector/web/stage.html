@@ -439,7 +439,9 @@ function showFrame(now) {
   return { scene: s.scene, beat, frac: ((beat % 1) + 1) % 1, bwb: 1 + ((Math.floor(beat) - 1) % 4 + 4) % 4, hue: s.hue || 0,
            progress: s.progress || 0, since, energy: s.energy, ordinal, finale: drops.length > 1 && ordinal === drops.length - 1,
            dropAt: s.beats_to_drop != null ? (s.beat || 0) + s.beats_to_drop : NaN,
-           strobe: !!s.strobe, strobeDiv: s.strobe_div ?? 2, blinder: !!s.blinder, black: !!(s.black_hold || s.mode === "blackout"),
+           // the Commander's strobe, or the auto strobe in a drop (its own rate, flash length and phase)
+           strobe: !!s.strobe || !!s.strobe_auto, strobeDiv: s.strobe_auto ? s.strobe_auto.div : s.strobe_div ?? 2,
+           strobeDuty: s.strobe_auto ? s.strobe_auto.duty : 0.5, strobePhase: s.strobe_auto ? s.strobe_auto.phase : 0, blinder: !!s.blinder, black: !!(s.black_hold || s.mode === "blackout"),
            intensity: s.intensity ?? 0.8 };
 }
 const hsl = (h, s = 1, l = 0.5) => new THREE.Color().setHSL(((h % 1) + 1) % 1, s, l);
@@ -1111,7 +1113,7 @@ const cTmp = new THREE.Color();
 function update(now) {
   curPreview = pickPreview();
   const f = showFrame(now), sc = f.scene, black = f.black || sc === "PREDROP";
-  const strobeOn = f.blinder || (f.strobe && (f.strobeDiv ? ((f.frac * f.strobeDiv) % 1) < 0.5 : (now / 83) % 1 < 0.5));
+  const strobeOn = f.blinder || (f.strobe && (f.strobeDiv ? ((f.frac * f.strobeDiv + (f.strobePhase || 0)) % 1) < (f.strobeDuty ?? 0.5) : (now / 83) % 1 < 0.5));
   const kick = Math.exp(-6 * f.frac);
   const beamAmt = 0.08 + 0.55 * haze;
   // Fast effects the engine applies to every fixture. The preview arrives 25x/s, which can fall

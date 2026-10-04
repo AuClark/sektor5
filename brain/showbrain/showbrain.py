@@ -132,6 +132,21 @@ def key_hue(key):
         return 0.83
 
 
+# ---------------------------------------------------------------- auto strobe
+# Full-white strobe on every LED at chosen moments of some high-energy drops (not all: it only
+# lands if it's rare). Each strobed drop gets one or two of these, in beats from the drop beat
+# (scaled to the drop's length; written for a 16-bar drop): (from, to, flashes per beat, duty,
+# phase). A flash is on while ((frac * div + phase) % 1) < duty.
+STROBE_PATTERNS = {
+    "opener":      [(0.25, 4, 4, 0.5, 0.0)],                                     # the first bar, at 16ths, after the white hit
+    "peak":        [(56, 60, 2, 0.5, 0.0), (60, 64, 4, 0.5, 0.0)],               # the last 2 bars: 8ths, then 16ths into what's next
+    "ramp":        [(48, 52, 1, 0.35, 0.0), (52, 56, 2, 0.4, 0.0), (56, 60, 4, 0.5, 0.0)],   # speeding up over 3 bars
+    "phrase_ends": [(15, 16, 4, 0.5, 0.0), (31, 32, 4, 0.5, 0.0), (47, 48, 4, 0.5, 0.0), (63, 64, 4, 0.5, 0.0)],
+    "offbeats":    [(32, 40, 1, 0.25, 0.5)],                                     # 2 bars on the "and"s
+    "stutter":     [(16, 17, 4, 0.5, 0.0), (32, 33, 4, 0.5, 0.0), (48, 49, 4, 0.5, 0.0)],   # the first beat of each phrase
+}
+
+
 # ---------------------------------------------------------------- engine
 
 class Engine:
@@ -146,6 +161,12 @@ class Engine:
         self.forced = None              # {"kind": "build"|"drop", "player", "start", "drop"} in beats
         # Performance layer (Commander pads), applied on top of the auto show.
         self.strobe_div = 2             # strobe flashes per beat; 0 = free-running 12 Hz
+        acfg = CONFIG.get("auto_strobe", {})
+        self.auto_strobe = acfg.get("enabled", True)    # strobe some high-energy drops on its own (STROBE_PATTERNS)
+        self.strobe_plans = collections.OrderedDict()   # (title, drop start beat) -> plan (None = not this drop)
+        self.strobe_salt = random.random()              # so a replayed set strobes different drops
+        self.last_strobed = None                        # (title, start beat) of the last drop that strobed
+        self.strobe_now = None                          # (div, duty, phase) while the auto strobe is flashing
         self.blinder = False            # hold: everything full white
         self.black_hold = False         # hold: momentary blackout
         self.flash_t = 0.0              # tap: white hit decaying over about a beat
@@ -561,14 +582,65 @@ class Engine:
                 self.filters[int(name[2:name.index("_")])] = (v - 64) / 63.0
         self.midi_t = newest
 
+    def _strobe_plan(self, ctx, start):
+        """Whether this drop strobes, and how: a high-energy drop strobes by chance (more likely if
+        it's the track's last drop or very loud), never two drops running."""
+        cfg = CONFIG.get("auto_strobe", {})
+        prev = self._prev_drop(ctx, start)
+        if ctx.get("energy", 0.0) < cfg.get("min_energy", 0.7) or (prev is not None and (ctx.get("title"), prev) == self.last_strobed):
+            return None
+        bars = sorted(d["bar"] for d in ctx.get("drops") or [])
+        last = bool(bars) and (start - 1) // 4 + 1 >= bars[-1]
+        chance = cfg.get("chance", 0.3) + (0.25 if last else 0.0) + (0.15 if ctx.get("energy", 0) > 0.9 else 0.0)
+        rnd = random.Random(f"{ctx.get('title')}:{start}:{self.strobe_salt}")
+        if rnd.random() >= chance:
+            return None
+        names = rnd.sample(sorted(STROBE_PATTERNS), 2 if rnd.random() < 0.35 else 1)
+        k = ctx.get("drop_bars", CONFIG.get("drop_bars", 16)) * 4 / 64
+        spans = sorted((a * k, b * k, d, duty, ph) for n in names for a, b, d, duty, ph in STROBE_PATTERNS[n])
+        self.last_strobed = (ctx.get("title"), start)
+        return {"patterns": names, "spans": spans}
+
+    def _prev_drop(self, ctx, start):
+        """Start beat of the drop before the one starting at `start` (None for the first)."""
+        prev = [(b - 1) * 4 + 1 for b in sorted(d["bar"] for d in ctx.get("drops") or []) if (b - 1) * 4 + 1 < start - 2]
+        return prev[-1] if prev else None
+
+    def _auto_strobe(self, ctx):
+        """(div, duty, phase) while this drop's plan has the strobe flashing, else None. Capped at
+        auto_strobe.max_hz flashes a second (halving the rate until it fits)."""
+        if not self.auto_strobe or self.mode != "auto" or ctx["scene"] != "DROP":
+            return None
+        sd = ctx.get("since_drop", 0.0)
+        start = round(ctx["beat"] - sd)
+        key = (ctx.get("title"), start)                 # drops often fall on the same bar in different tracks
+        if key not in self.strobe_plans:
+            self.strobe_plans[key] = self._strobe_plan(ctx, start)
+            while len(self.strobe_plans) > 32:
+                self.strobe_plans.popitem(last=False)
+        plan = self.strobe_plans[key]
+        for a, b, div, duty, ph in (plan or {}).get("spans", ()):
+            if a <= sd < b:
+                hz = max(1.0, ctx.get("bpm") or 128.0) / 60
+                while div > 1 and hz * div > CONFIG.get("auto_strobe", {}).get("max_hz", 10.0):
+                    div //= 2
+                return div, duty, ph
+        return None
+
     def output_fx(self, ctx, t):
         """Post-look effects every fixture applies: strobe, white (blinder / flash), blackout."""
         strobe = None
+        self.strobe_now = None
         if self.strobe or (self.mixer_react and self.fx_active):
             if self.strobe_div:
                 strobe = ((ctx["frac"] * self.strobe_div) % 1.0) < 0.5
             else:
                 strobe = (t * 12) % 1.0 < 0.5
+        else:
+            self.strobe_now = self._auto_strobe(ctx)
+            if self.strobe_now:
+                div, duty, ph = self.strobe_now
+                strobe = ((ctx["frac"] * div + ph) % 1.0) < duty
         white = 1.0 if self.blinder else (math.exp(-(t - self.flash_t) * 4) if t - self.flash_t < 1.5 else 0.0)
         intensity = self.intensity
         level = self.mix.get("level")
@@ -596,6 +668,8 @@ class Engine:
             self.strobe = bool(c.get("value", not self.strobe))
         elif cmd == "strobe_div":
             self.strobe_div = int(c.get("value", 2))
+        elif cmd == "auto_strobe":
+            self.auto_strobe = bool(c.get("value", not self.auto_strobe))
         elif cmd == "blinder":
             self.blinder = bool(c.get("value", False))
         elif cmd == "black_hold":
@@ -958,7 +1032,8 @@ def main():
         engine.state = {k: v for k, v in ctx.items()} | {
             "mode": engine.mode, "follow": engine.follow, "lead_ms": engine.lead_ms,
             "intensity": engine.intensity, "hold": engine.hold, "strobe": engine.strobe,
-            "strobe_div": engine.strobe_div, "blinder": engine.blinder, "black_hold": engine.black_hold,
+            "strobe_div": engine.strobe_div, "auto_strobe": engine.auto_strobe,
+            "strobe_auto": None if not engine.strobe_now else dict(zip(("div", "duty", "phase"), engine.strobe_now)), "blinder": engine.blinder, "black_hold": engine.black_hold,
             "look": engine.look, "play": looks.play_of(ctx), "play_lock": engine.play, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
             "visual": None if not engine.visual else {"hue": round(engine.visual["hue"], 3), "sat": round(engine.visual["sat"], 2),
                                                       "age_s": round(time.time() - engine.visual["t"], 1)},
