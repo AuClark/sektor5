@@ -87,6 +87,7 @@ class Decks:
                 with urllib.request.urlopen(f"http://127.0.0.1:8080/api/timeline/{player}", timeout=3) as r:
                     t = json.loads(r.read())
                 if t.get("ref") == ref:
+                    self._fetch_wave(player, t)
                     with self.lock:
                         self.timelines[ref] = t
                         self.fetching.discard(ref)
@@ -97,6 +98,21 @@ class Decks:
             time.sleep(1)
         with self.lock:
             self.fetching.discard(ref)
+
+    def _fetch_wave(self, player, t):
+        """The track's rekordbox colour waveform at full detail (150 frames a second: height 0-31,
+        then bass, mids, highs 0-255), kept with its timeline as t["_wave"] for the waveform
+        lights (looks.wave_on). Without it the lights just don't offer that look."""
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:8080/api/wavedetail/{player}", timeout=5) as r:
+                raw = r.read()
+            if len(raw) >= 4 * 150:
+                t["_wave"] = np.frombuffer(raw[:len(raw) // 4 * 4], np.uint8).reshape(-1, 4)
+                bm = t.get("beatMs") or []
+                gaps = sorted(b - a for a, b in zip(bm, bm[1:]) if b > a)
+                t["_wave_fpb"] = (gaps[len(gaps) // 2] if gaps else 500) * 0.15     # frames a beat
+        except Exception:
+            pass
 
     def snapshot(self):
         with self.lock:
@@ -180,6 +196,7 @@ class Engine:
         self.speed = 1.0                # 0.5 half-time, 1, 2 double-time
         self.play = None                # latched interplay (looks.PLAYS), else picked by the track
         self.music = None               # the mixer's melody analysis (react()), for the laser show
+        self.wave_mode = CONFIG.get("wave_lights", "auto")   # the lights draw the track's waveform: auto | on | off
         # Mixer reactions (DJM-450 via brain/mixer): bass kill, level, kicks, and mapped MIDI controls.
         self.mixer_react = CONFIG.get("mixer", {}).get("react", True)
         self.bass_was_out = False
@@ -345,7 +362,7 @@ class Engine:
     def decide(self, t):
         status, master, beats, timelines = self.decks.snapshot()
         live = self.live_deck(status, master, timelines, t)
-        ctx = {"t": t, "live": live, "scene": "IDLE", "hue": 0.83, "frac": 0.0, "bwb": 1, "bar": 0,
+        ctx = {"t": t, "live": live, "scene": "IDLE", "hue": 0.83, "frac": 0.0, "bwb": 1, "bar": 0, "wave_mode": self.wave_mode,
                "beat": 0.0, "progress": 0.0, "since_drop": 0.0, "beats_to_drop": None, "title": None,
                "bpm": 0.0, "section": None, "next_drop_bar": None,
                "section_progress": 0.0, "energy": 0.5}
@@ -363,6 +380,9 @@ class Engine:
         ctx.update(title=p.get("title"), bpm=p.get("bpm", 0), hue=key_hue(p.get("key")))
         tl = timelines.get(p.get("ref"))
         pos = self.position(p, t + self.lead_ms / 1000)
+        if tl is not None and pos is not None and tl.get("_wave") is not None:
+            # The waveform at the playhead (looks' waveform lights); "_" keys stay out of the state.
+            ctx["_wave"], ctx["_wave_f"], ctx["_wave_fpb"] = tl["_wave"], pos * 0.15, tl["_wave_fpb"]
 
         if tl is None or pos is None:
             # No timeline yet: follow beat events only.
@@ -684,6 +704,11 @@ class Engine:
                 return {"ok": False, "error": f"unknown look {v}"}
             self.look = None if v in (None, "AUTO") else v
             self.look_t = t
+        elif cmd == "wave_lights":
+            v = c.get("value")
+            if v not in ("auto", "on", "off"):
+                return {"ok": False, "error": f"unknown wave_lights {v}"}
+            self.wave_mode = v
         elif cmd == "play":
             v = c.get("value")
             if v not in (None, "AUTO", *looks.PLAYS):
@@ -1029,11 +1054,11 @@ def main():
             ctx["scene"] = "PREDROP"
         ctx = engine.react(ctx, t0)
         fx = engine.output_fx(ctx, t0)
-        engine.state = {k: v for k, v in ctx.items()} | {
+        engine.state = {k: v for k, v in ctx.items() if not k.startswith("_")} | {
             "mode": engine.mode, "follow": engine.follow, "lead_ms": engine.lead_ms,
             "intensity": engine.intensity, "hold": engine.hold, "strobe": engine.strobe,
             "strobe_div": engine.strobe_div, "auto_strobe": engine.auto_strobe,
-            "strobe_auto": None if not engine.strobe_now else dict(zip(("div", "duty", "phase"), engine.strobe_now)), "blinder": engine.blinder, "black_hold": engine.black_hold,
+            "strobe_auto": None if not engine.strobe_now else dict(zip(("div", "duty", "phase"), engine.strobe_now)), "wave_lights": engine.wave_mode, "wave_now": looks.wave_on(ctx), "blinder": engine.blinder, "black_hold": engine.black_hold,
             "look": engine.look, "play": looks.play_of(ctx), "play_lock": engine.play, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
             "visual": None if not engine.visual else {"hue": round(engine.visual["hue"], 3), "sat": round(engine.visual["sat"], 2),
                                                       "age_s": round(time.time() - engine.visual["t"], 1)},

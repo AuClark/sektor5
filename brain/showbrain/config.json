@@ -6,6 +6,7 @@
   "intensity": 1.0,
   "drop_bars": 16,
   "auto_strobe": {"enabled": true, "min_energy": 0.7, "chance": 0.3, "max_hz": 10.0},
+  "wave_lights": "auto",
   "fixtures": [
     {
       "name": "tube1",

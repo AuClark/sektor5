@@ -266,10 +266,94 @@ def hit(ctx, role, pos=None):
     return float(k) if np.ndim(k) == 0 else k
 
 
+# ---------------------------------------------------------------- waveform lights
+# The lights draw the track itself: rekordbox's colour waveform at full detail (150 frames a
+# second), read at the playhead (showbrain puts it in ctx["_wave"], with the frame now and frames a
+# beat). Tubes: the next two beats fall down the tube and land at the bottom as you hear them.
+# Pyramids: each leg a level meter (bass, mids, highs, everything). Panel: a scrolling waveform,
+# rekordbox-style, the playhead in the middle. Par can: coloured and dimmed by the bands. Bass,
+# mids and highs take the three palette colours. Picked for some phrases (wave_on), never in a
+# build, a hold or the pre-drop, which have their own looks.
+
+def wave_on(ctx):
+    """Whether the lights draw the waveform now: the Commander's on / off, else by the track, for
+    some 8-bar phrases of a groove, intro, outro or breakdown and some 4-bar phrases of a drop
+    (after its first bar)."""
+    mode = ctx.get("wave_mode", "auto")
+    if mode == "off" or ctx.get("_wave") is None:
+        return False
+    s = ctx["scene"]
+    if s in ("BUILD", "HOLD", "PREDROP", "PAUSED", "IDLE"):
+        return False
+    if mode == "on":
+        return True
+    if s == "DROP":
+        if ctx.get("since_drop", 0) < 4:
+            return False
+        span, chance = 4, 0.25
+    else:
+        span, chance = 8, 0.3 if s == "GROOVE" else 0.35
+    bar = int(ctx.get("bar", 0))
+    seed = sum(ord(c) for c in (ctx.get("title") or "")) * 13 + bar // span
+    return _jhash(seed * 0.71 + 3.3) < chance
+
+
+def wave_window(ctx, n, behind, ahead):
+    """(n, 4): the waveform from `behind` beats before the playhead to `ahead` beats after it,
+    as height, bass, mids, highs in 0..1."""
+    d, f0, fpb = ctx["_wave"], ctx["_wave_f"], ctx["_wave_fpb"]
+    i = np.clip((f0 + np.linspace(-behind * fpb, ahead * fpb, n)).astype(int), 0, len(d) - 1)
+    v = d[i].astype(np.float32)
+    return v / np.array([31.0, 255.0, 255.0, 255.0], np.float32)
+
+
+def wave_now(ctx):
+    """(height, bass, mids, highs) now: the loudest of the last ~40 ms, so meters don't flicker."""
+    return wave_window(ctx, 7, 0.08, 0.0).max(axis=0)
+
+
+def wave_colour(ctx, v):
+    """Colour for waveform samples v (..., 4): the palette's three colours mixed by bass, mids and
+    highs (like rekordbox's red, green and blue), as bright as the waveform is tall."""
+    P = hsv(palette(ctx), 1.0, 1.0)                                     # (3, 3): bass, mids, highs
+    c = v[..., 1:4] @ P
+    c = c / np.maximum(c.max(axis=-1, keepdims=True), 1e-4)
+    return c * (np.clip(v[..., :1], 0, 1) ** 1.3)
+
+
+def strip_wave(ctx, n, role):
+    v = wave_window(ctx, n, 0.0, 2.0)                                   # bottom = now, top = 2 beats on
+    out = wave_colour(ctx, v)
+    out[:3] = np.maximum(out[:3], 0.25 * v[0, 0])                       # the landing point glows
+    return out[::-1] if role.get("flip") else out
+
+
+def pyramid_wave(ctx, n, role, order, x):
+    lv = wave_now(ctx)                                                  # h, bass, mids, highs
+    leg = np.array([lv[1], lv[2], lv[3], lv[0]], np.float32)[order.astype(int).ravel() % 4][:, None]   # (4, 1) level per leg
+    band = np.array([1, 2, 3, 0])[order.astype(int).ravel() % 4]
+    P = hsv(palette(ctx), 1.0, 1.0)
+    col = np.where((band == 0)[:, None], np.ones(3, np.float32), P[np.clip(band - 1, 0, 2)])   # (4, 3)
+    fill = (x <= leg).astype(np.float32)[..., None]
+    cap = np.exp(-np.abs(x - leg) * 60)[..., None]
+    return col[:, None, :] * fill * (0.35 + 0.65 * x[..., None]) + cap * 0.9
+
+
+def panel_wave(ctx, w, h, X, Y):
+    v = wave_window(ctx, w, 1.0, 1.0)                                   # left = a beat ago, right = a beat on
+    amp = v[:, 0] * (h - 1) / 2
+    on = (np.abs(Y - (h - 1) / 2) <= amp[None, :] + 0.5).astype(np.float32)
+    out = wave_colour(ctx, v)[None, :, :] * on[..., None]
+    head = np.exp(-np.abs(X - (w - 1) / 2) * 1.5)[..., None]
+    return np.maximum(out, head * 0.6)
+
+
 # ---------------------------------------------------------------- strips
 
 @unyellow
 def strip(ctx, n, role, state):
+    if wave_on(ctx):
+        return strip_wave(ctx, n, role)
     s, hue = ctx["scene"], ctx["hue"]
     x = np.linspace(0, 1, n, dtype=np.float32)
     frac, bwb, beat = clock(ctx, role)
@@ -449,7 +533,11 @@ def pyramid(ctx, n, role, state):
     laser = 0.0
     white = np.ones(3, np.float32)
 
-    if s in ("BUILD", "HOLD"):
+    if wave_on(ctx):
+        out = pyramid_wave(ctx, n, role, order, x)
+        if s == "DROP":
+            laser = 1.0 if pyramid_laser(ctx) else 0.0
+    elif s in ("BUILD", "HOLD"):
         # The spiral fill: the legs light from the feet in a spiral round the outside, reaching
         # the apex as the build ends; a white head leads it, and the lit part flickers faster near the end.
         p = ctx["progress"]
@@ -626,6 +714,8 @@ def panel(ctx, w, h, role, state):
     centre = 1 - np.abs(Y - (h - 1) / 2) / (h * 0.62)
 
     cols = stage_pos(role) + (X / max(1, w - 1) - 0.5) * role.get("span", 0.5)   # where each column stands
+    if wave_on(ctx):
+        return panel_wave(ctx, w, h, X, Y)
     if s == "INTRO":
         v = 0.08 + 0.04 * math.sin(2 * math.pi * beat / 8) + 0.5 * np.minimum(1.0, hit(ctx, role, cols) * drive(ctx)) * centre
         return hsv(layer(ctx, (cols + 1) / 2, Y / max(1, h - 1)), 0.8, v)
@@ -685,7 +775,10 @@ def par(ctx, role, state):
         r, g, b = hsv(h, s_, v).tolist()
         out.update(r=r, g=g, b=b)
 
-    if s == "IDLE":
+    if wave_on(ctx):
+        c = wave_colour(ctx, wave_now(ctx)).tolist()
+        out.update(r=c[0], g=c[1], b=c[2])
+    elif s == "IDLE":
         colour(ctx["t"] * 0.01, 0.9, 0.15)            # slow dim colour drift
     elif s == "INTRO":
         colour(layer(ctx, place(role), 0.5), 0.8, 0.12 + 0.6 * min(1.0, hit(ctx, role) * drive(ctx)))
