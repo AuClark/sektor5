@@ -53,7 +53,8 @@ def parse(c):
 def join_frame(ssid, pw):
     b = bytearray(0x44); b[0], b[1] = 0x5A, 0x8B
     s, p = ssid.encode()[:32], pw.encode()[:32]
-    b[2:2 + len(s)] = s; b[0x22:0x22 + len(p)] = p; b[-1] = 0xF5
+    b[2:2 + len(s)] = s; b[0x22:0x22 + len(p)] = p
+    b[-2] = xor(b[2:-2]); b[-1] = 0xF5        # DeviceInterface::routerset (5A 8A, wifiset, renames the fan's own AP)
     return bytes(b)
 
 
@@ -106,9 +107,10 @@ def reader(conn, log=print):
             d = conn.recv(4096)
             if not d: log("fan closed the connection"); return
             if b"\x5a\x0e\x0e\xf5" in d: CREATED.set()
-            i = d.find(b"\x5a\x84\x00")
-            if i >= 0 and len(d) > i + 3:
-                FILES[:] = [n.decode("utf-8", "replace") for n in d[i + 4:i + 4 + d[i + 3]].rstrip(b"\x00").split(b"/")]
+            i = d.find(b"\x5a\x84")                 # file list: 5A 84 <length, 16-bit BE> <names joined by /> 00 F5
+            if i >= 0 and len(d) > i + 4:
+                n = int.from_bytes(d[i + 2:i + 4], "big")
+                FILES[:] = [x.decode("utf-8", "replace") for x in d[i + 4:i + 4 + n].rstrip(b"\x00").split(b"/")]
             log(f"fan -> {len(d)} B: {d[:64].hex(' ')}{' ...' if len(d) > 64 else ''}")
         except socket.timeout:
             continue
@@ -140,7 +142,7 @@ PICTURE_HEADER = (60).to_bytes(4, "little")     # model 15: rate 12.0 x 5
 
 def upload(conn, frames, header=PICTURE_HEADER, name=None, n=0, log=print):
     """Send encoded frames as one new clip; returns its name (as the fan lists it, without .mp4)."""
-    name = name or time.strftime("%m%d%H%M") + ".mp4"
+    name = name or time.strftime("%d%H%M%S") + ".mp4"   # as the app names them
     with SEND:
         CREATED.clear()
         for attempt in range(3):                # the app re-sends after 2 s and gives up at 5 ("code:12")
