@@ -267,8 +267,8 @@ $('flash').addEventListener('pointerdown', flash);
 const tap = () => { cmd('tap'); $('tap').classList.add('held'); setTimeout(() => $('tap').classList.remove('held'), 90); };
 $('tap').addEventListener('pointerdown', tap);
 
-// 12 hues around the wheel, plus white-ish pastel at the end.
-const HUES = [0, 0.04, 0.09, 0.15, 0.3, 0.45, 0.5, 0.55, 0.62, 0.72, 0.8, 0.9];
+// 12 hues around the wheel. No yellow: the lights skip it (looks.no_yellow), so it has no swatch.
+const HUES = [0, 0.04, 0.09, 0.3, 0.45, 0.5, 0.55, 0.62, 0.72, 0.8, 0.9, 0.96];
 $('swatches').innerHTML = HUES.map(h => `<button data-h="${h}" style="background:hsl(${h * 360},100%,55%)"></button>`).join('');
 document.querySelectorAll('#swatches button').forEach(b => b.onclick = () => cmd('palette', {mode: 'lock', hue: +b.dataset.h}));
 

@@ -14,8 +14,55 @@ import numpy as np
 rng = np.random.default_rng()
 
 
+# No yellow on the rig: hues from orange to green are squeezed so they skip the yellow band.
+# Everything outside the window is untouched, and the squeeze is continuous, so fades still glide.
+NO_YELLOW = (0.03, 0.36)       # the window that's squeezed (red-orange .. green)
+YELLOW = (0.095, 0.25)         # the band that's skipped (amber, yellow, chartreuse): 34-90 degrees
+
+
+def no_yellow(h):
+    a, b = NO_YELLOW
+    y0, y1 = YELLOW
+    t = (h - a) / (b - a)
+    o = a + t * ((b - a) - (y1 - y0))
+    o = np.where(o >= y0, o + (y1 - y0), o)
+    return np.where((h > a) & (h < b), o, h).astype(np.float32)
+
+
 def hsv(h, s, v):
-    """Vectorised HSV -> RGB. h, s, v broadcast; returns (..., 3)."""
+    """Vectorised HSV -> RGB. h, s, v broadcast; returns (..., 3). Never yellow (no_yellow)."""
+    return _hsv(no_yellow(np.asarray(h, dtype=np.float32) % 1.0), s, v)
+
+
+def unyellow(fn):
+    """Last guard on a fixture's frame: two colours blended in RGB (red under a green comet) can
+    still make yellow, so any clearly yellow pixel is turned to orange or green, whichever is nearer,
+    keeping its brightness and saturation."""
+    def guarded(*a, **k):
+        return unyellow_rgb(fn(*a, **k))
+    guarded.__doc__, guarded.__name__ = fn.__doc__, fn.__name__
+    return guarded
+
+
+def unyellow_rgb(out):
+    """unyellow() for one frame: (..., 3) RGB in 0..1."""
+    out = np.asarray(out, np.float32)
+    r, g, b = out[..., 0], out[..., 1], out[..., 2]
+    mx, mn = out.max(-1), out.min(-1)
+    c = mx - mn
+    yel = (b == mn) & (c > 0.1 * np.maximum(mx, 1e-6)) & (mx > 0.02)
+    if not yel.any():
+        return out
+    h = np.where(r >= g, (g - b) / np.maximum(c, 1e-6), 2 - (r - b) / np.maximum(c, 1e-6)) / 6   # 0 red .. 1/3 green
+    yel &= (h > YELLOW[0]) & (h < YELLOW[1])
+    if not yel.any():
+        return out
+    fixed = _hsv(np.where(h < sum(YELLOW) / 2, YELLOW[0], YELLOW[1]), c / np.maximum(mx, 1e-6), mx)
+    return np.where(yel[..., None], fixed, out).astype(np.float32)
+
+
+def _hsv(h, s, v):
+    """Plain HSV -> RGB, yellow allowed (only the guards use it directly)."""
     h = np.asarray(h, dtype=np.float32) % 1.0
     s = np.clip(np.asarray(s, dtype=np.float32), 0, 1)
     v = np.clip(np.asarray(v, dtype=np.float32), 0, 1)
@@ -50,6 +97,49 @@ def drive(ctx):
     return 0.8 + 0.5 * min(1.0, max(0.0, ctx.get("energy", 0.5)))
 
 
+# ---------------------------------------------------------------- layered colour
+# Three colours at once instead of one and its opposite: the track's hue plus two more, by a scheme
+# that changes with the track and every 32 bars. layer() spreads them across the stage and up each
+# fixture, drifting a step every 8 bars, so the rig is a gradient rather than one colour.
+
+SCHEMES = (
+    (0.0, 1 / 3, 2 / 3),       # triad
+    (0.0, 0.42, 0.58),         # split complement
+    (0.0, 0.10, 0.50),         # a neighbour and the opposite
+    (0.0, -0.10, 0.10),        # analogous: one family of colour
+    (0.0, 0.25, 0.50),         # a quarter round, then the opposite
+)
+
+
+def palette(ctx):
+    """The three hues for this stretch of the track."""
+    seed = sum(ord(c) for c in (ctx.get("title") or "")) * 3 + int(ctx.get("bar", 0)) // 32
+    return (ctx["hue"] + np.array(SCHEMES[seed % len(SCHEMES)], np.float32)) % 1.0
+
+
+def pal(ctx, i):
+    """Palette colour i (wraps; i may be an array)."""
+    return np.take(palette(ctx), np.asarray(i, dtype=np.int64) % 3)
+
+
+def layer(ctx, u, x=0.0, shift=0.0):
+    """Hue at stage place u (0 far left .. 1 far right) and height or depth x (0..1) in a fixture:
+    the palette laid across the rig, each colour held a while then blending into the next."""
+    p = palette(ctx)
+    t = (np.asarray(u, np.float32) * 0.6 + np.asarray(x, np.float32) * 0.4) * 2 + ctx.get("beat", 0) / 32 + shift
+    t = np.mod(t, 3.0)
+    i = np.floor(t).astype(np.int64) % 3
+    f = np.clip((t - np.floor(t) - 0.25) / 0.5, 0, 1)
+    f = f * f * (3 - 2 * f)
+    a, b = p[i], p[(i + 1) % 3]
+    return (a + (((b - a + 0.5) % 1.0) - 0.5) * f).astype(np.float32)
+
+
+def place(role):
+    """0 far left .. 1 far right."""
+    return (stage_pos(role) + 1) / 2
+
+
 def hat(frac):
     """The off-beat hi-hat: a short flick on the 'and' of every beat."""
     return math.exp(-14 * (frac - 0.5)) if frac >= 0.5 else 0.0
@@ -62,9 +152,11 @@ def hat(frac):
 # and every fixture works out its own kick from it, so they stay locked together with no messages
 # between them. Left and right are always mirror images, or a call and its answer.
 
-PLAYS = ("together", "alternate", "swap", "bounce", "chase", "out", "in")
-CALM_PLAYS = ("together", "alternate", "out")                  # intro, outro: nothing too busy
-DROP_PLAYS = ("alternate", "bounce", "chase", "out", "swap")   # the drop, after its first bar
+PLAYS = ("together", "alternate", "swap", "bounce", "chase", "out", "in",
+         "zigzag", "cross", "stack", "wave", "sparkle")
+CALM_PLAYS = ("together", "alternate", "out", "wave", "stack")                      # intro, outro: nothing too busy
+DROP_PLAYS = ("alternate", "bounce", "chase", "out", "swap", "zigzag", "cross", "sparkle")   # the drop, after its first bar
+FAST_PLAYS = ("bounce", "chase", "out", "in", "zigzag", "cross", "sparkle")        # a short flash reads as motion
 
 
 def stage_pos(role):
@@ -118,7 +210,40 @@ def _hits(play, pos, beat):
         return 1.0, [0.5 * d]
     if play == "in":                                    # the ends on the beat, in to the middle by the 'and'
         return 1.0, [0.5 * (1 - d)]
+    if play == "zigzag":                                # side to side on the 16ths, ends in to the middle, then back out
+        first = (1 - d) + np.where(right, 0.25, 0.0)    # L end 0, R end .25, L inner .5, R inner .75, middle 1
+        return 2.0, [first, 2.0 - first]
+    if play == "cross":                                 # the diagonals trade 8ths: L end + R inner, then R end + L inner
+        a = (left & (d > 0.75)) | (right & (d <= 0.75))
+        b = (right & (d > 0.75)) | (left & (d <= 0.75))
+        first = np.where(a, 0.0, np.where(b, 0.5, 0.25))
+        return 1.0, [first, np.where(a | b, first, 0.75)]   # the middle answers on both 16ths between
+    if play == "stack":                                 # builds out across the bar: the middle, then the inner pair, then the ends
+        start = np.floor(np.minimum(d, 0.999) * 3)      # beat each place joins in (0, 1, 2)
+        return 4.0, [np.maximum(float(j), start) for j in range(4)]
     return 1.0, [0.0 * pos]
+
+
+def _sparkle(pos, beat, steps=6, chance=0.35):
+    """Random places on the 16ths, the same on every fixture (a hash of the 16th and the place, so
+    nothing is sent between them). Beats since this place's last sparkle, or a large number."""
+    slot = np.round(np.asarray(pos, dtype=np.float64) * 8).astype(np.int64) + 16
+    now = beat * 4
+    s0 = int(math.floor(now))
+    since = np.full(slot.shape, 99.0)
+    for j in range(steps - 1, -1, -1):                  # oldest first, so the newest sparkle wins
+        s = s0 - j
+        lucky = (((s * 73856093) ^ (slot * 19349663)) % 1009) / 1009.0 < chance
+        since = np.where(lucky, (now - s) / 4, since)
+    return since
+
+
+def _wave(pos, beat):
+    """A soft hump rolling across the stage, left to right over 2 beats and back over the next 2."""
+    u = (np.asarray(pos, dtype=np.float32) + 1) / 2
+    ph = (beat % 4) / 2
+    at = ph if ph < 1 else 2 - ph
+    return np.exp(-((u - at) / 0.22) ** 2)
 
 
 def hit(ctx, role, pos=None):
@@ -128,15 +253,22 @@ def hit(ctx, role, pos=None):
     # Beats from a downbeat (beat 1 is the first downbeat); with no timeline, the beat events' place in the bar.
     beat = beat - 1 if ctx.get("bar") else (bwb - 1) + frac
     play = play_of(ctx)
-    period, phases = _hits(play, stage_pos(role) if pos is None else pos, beat)
-    since = np.min([np.mod(beat - ph, period) for ph in phases], axis=0)
-    fast = play in ("bounce", "chase", "out", "in")     # moving plays: a short flash reads as motion
-    k = np.exp(-(10.0 if fast else 6.0) * since)
+    where = stage_pos(role) if pos is None else pos
+    if play == "wave":
+        k = _wave(where, beat)
+        return float(k) if np.ndim(k) == 0 else k
+    if play == "sparkle":
+        since = _sparkle(where, beat)
+    else:
+        period, phases = _hits(play, where, beat)
+        since = np.min([np.mod(beat - ph, period) for ph in phases], axis=0)
+    k = np.exp(-(10.0 if play in FAST_PLAYS else 6.0) * since)
     return float(k) if np.ndim(k) == 0 else k
 
 
 # ---------------------------------------------------------------- strips
 
+@unyellow
 def strip(ctx, n, role, state):
     s, hue = ctx["scene"], ctx["hue"]
     x = np.linspace(0, 1, n, dtype=np.float32)
@@ -149,14 +281,14 @@ def strip(ctx, n, role, state):
 
     if s == "INTRO":
         v = 0.1 + 0.06 * math.sin(2 * math.pi * beat / 8) + 0.6 * hit(ctx, role) * drive(ctx)
-        return hsv(hue + x * 0.1, 0.8, v)
+        return hsv(layer(ctx, place(role), x), 0.8, v)
 
     if s in ("GROOVE", "OUTRO", "PAUSED"):
         fade = {"OUTRO": 0.8, "PAUSED": 0.3}.get(s, 1.0)
         k = 0.0 if s == "PAUSED" else min(1.0, hit(ctx, role) * drive(ctx))
         accent = 0.35 if (bwb == 1) != bool(role.get("flip")) and bwb in (1, 3) else 0.0
         lvl = (0.18 + 0.82 * k + (0.25 * hat(frac) if s != "PAUSED" else 0.0)) * fade
-        base = hsv(hue + 0.03 * (ctx["bar"] % 4) + x * 0.05, 1.0, lvl)
+        base = hsv(layer(ctx, place(role), x), 1.0, lvl)
         out = lerp(base, np.full_like(base, lvl), accent * k)
         # Comet climbs the tubes once per bar, handed from one tube to the next.
         g = max(1, role.get("group", 1))
@@ -165,7 +297,7 @@ def strip(ctx, n, role, state):
         if 0 <= local <= 1.2:
             d = local * (n + 10) - np.arange(n)
             tail = np.where((d >= 0) & (d < 10), np.exp(-d / 3), 0)
-            out = lerp(out, hsv(hue + 0.5, 0.6, fade)[None, :].repeat(n, 0), tail)
+            out = lerp(out, hsv(layer(ctx, place(role), 0.5, shift=1.5), 0.6, fade)[None, :].repeat(n, 0), tail)
         return strip_after(ctx, n, role, x, frac, beat, kick, out) if s == "GROOVE" else out
 
     if s == "BREAKDOWN":
@@ -235,13 +367,13 @@ def strip_drop(ctx, n, role, x, frac, bwb, beat, kick):
         return np.ones((n, 3), np.float32)
     if sd < 4:                                             # the first bar: the strobe
         on = ((sd * 2) % 1.0) <= 0.5
-        blocks = ((np.arange(n) // 6) + int(sd) + (1 if role.get("flip") else 0)) % 2
-        return hsv(hue + 0.5 * blocks, 1.0, (0.35 + 0.65 * kick) if on else 0.0)
+        blocks = (np.arange(n) // 6) + int(sd) + (1 if role.get("flip") else 0)
+        return hsv(pal(ctx, blocks), 1.0, (0.35 + 0.65 * kick) if on else 0.0)
     if sd < 16:                                            # slam
-        blocks = ((np.arange(n) - int(beat * 8)) // 6 + (1 if role.get("flip") else 0)) % 2
-        return hsv(hue + 0.5 * blocks, 1.0, 0.25 + 0.75 * kick)
+        blocks = (np.arange(n) - int(beat * 8)) // 6 + (1 if role.get("flip") else 0)
+        return hsv(pal(ctx, blocks), 1.0, 0.25 + 0.75 * kick)
     if sd < 32:                                            # chase
-        base = hsv(hue + flip + 0.05 * x, 1.0, 0.1 + 0.35 * kick)
+        base = hsv(layer(ctx, place(role), x, shift=2 * flip), 1.0, 0.1 + 0.35 * kick)
         f = (frac + (0.5 if role.get("flip") else 0.0)) % 1.0
         out = base
         for k in (0.0, 0.5):                               # two comets a beat
@@ -252,7 +384,7 @@ def strip_drop(ctx, n, role, x, frac, bwb, beat, kick):
             out = lerp(out, np.ones(3, np.float32)[None, :].repeat(n, 0), tail)
         return out
     if sd < 48:                                            # split
-        bar_hue = hue + 0.5 * (int(sd // 4) % 2) + flip
+        bar_hue = pal(ctx, int(sd // 4) + (1 if flip else 0))
         r = np.abs(x - 0.5) * 2
         ring = np.clip(1 - np.abs(r - frac * 1.2) * 6, 0, 1)
         out = hsv(bar_hue + 0.08 * r, 1.0, 0.15 + 0.45 * kick + 0.6 * ring)
@@ -261,7 +393,7 @@ def strip_drop(ctx, n, role, x, frac, bwb, beat, kick):
         return out
     # peak: 16th gate, hue moving every beat, then a white sweep from the bottom over the last 2 beats
     gate = ((beat * 4) % 1.0) < 0.5
-    out = hsv(hue + 0.25 * (int(beat) % 4) + flip + 0.1 * x, 1.0, (0.4 + 0.6 * kick) if gate else 0.05)
+    out = hsv(pal(ctx, int(beat) + (1 if flip else 0)) + 0.1 * x, 1.0, (0.4 + 0.6 * kick) if gate else 0.05)
     left = ctx.get("drop_bars", 16) * 4 - sd
     if left < 2:
         out = np.where((x <= 1 - left / 2)[:, None], 1.0, out).astype(np.float32)
@@ -305,6 +437,7 @@ def _pyr_mode(ctx, options):
     return options[seed % len(options)]
 
 
+@unyellow
 def pyramid(ctx, n, role, state):
     """(4n + 1, 3): the legs' LEDs, then the laser (1 = on)."""
     s, hue = ctx["scene"], ctx["hue"]
@@ -339,8 +472,8 @@ def pyramid(ctx, n, role, state):
             out = np.where((x >= front)[..., None], white, hsv(hue, 1, 0.1)) + 0 * order[..., None]
         else:
             out = pyramid_drop(ctx, order, x, frac, bwb, beat, kick if sd < 4 else hit(ctx, role), mir, st)
-        # The laser comes on with the drop: held for the first bar, then on the kick, then on the one.
-        laser = 1.0 if sd < 4 else (1.0 if frac < 0.5 else 0.0) if sd < 32 else (1.0 if bwb == 1 and frac < 0.5 else 0.0)
+        # The laser comes on with the drop: held for the first bar, then a new rhythm each phrase.
+        laser = 1.0 if pyramid_laser(ctx) else 0.0
     elif s == "BREAKDOWN":
         # Slow breathing in the complementary colour, brighter towards the apex, and a soft
         # spiral head drifting down every 2 bars.
@@ -354,12 +487,12 @@ def pyramid(ctx, n, role, state):
         fade = {"PAUSED": 0.4, "OUTRO": 0.8}.get(s, 1.0)
         breathe = 0.5 - 0.5 * math.cos(beat * math.pi / 4)
         k = 0.0 if s == "PAUSED" else min(1.0, hit(ctx, role) * drive(ctx))
-        out = hsv(hue + 0.1 * x + 0.03 * order, 0.8, (0.08 + 0.12 * breathe + 0.55 * k) * (0.4 + 0.6 * x) * fade)
+        out = hsv(layer(ctx, place(role), x, shift=0.25 * order), 0.8, (0.08 + 0.12 * breathe + 0.55 * k) * (0.4 + 0.6 * x) * fade)
     else:
         # GROOVE (and anything else): the feet pulse with the kick, plus, by track and every 16
         # bars, an orbiting comet (one leg a beat, round the pyramid) or a spiral chase (a bar a lap).
         k = min(1.0, hit(ctx, role) * drive(ctx))
-        base = hsv(hue + 0.06 * x + 0.03 * (ctx.get("bar", 0) % 4), 1.0, (0.2 + 0.8 * k + 0.2 * hat(frac)) * (1 - 0.4 * x))
+        base = hsv(layer(ctx, place(role), x, shift=0.2 * order), 1.0, (0.2 + 0.8 * k + 0.2 * hat(frac)) * (1 - 0.4 * x))
         if _pyr_mode(ctx, ("orbit", "spiral")) == "orbit":
             headx = frac * 1.15
             tail = np.clip(1 - (headx - x) * 5, 0, 1) * (x <= headx) * (True if mir else (order == (bwb - 1) % st))   # mirrored: up every leg each beat
@@ -368,11 +501,61 @@ def pyramid(ctx, n, role, state):
             headp = ((bwb - 1) + frac) / 4
             d = headp - sp
             tail = np.where((d >= 0) & (d < 0.12), np.exp(-d * 30), 0.0)
-        out = lerp(base, hsv(hue + 0.5, 0.35, 1.0)[None, None, :], tail * 0.9)
+        out = lerp(base, hsv(layer(ctx, place(role), x, shift=1.5), 0.35, 1.0), tail * 0.9)
         if s == "GROOVE":
             out = pyramid_after(ctx, order, x, frac, beat, kick, mir, st, out)
     legs =np.broadcast_to(np.asarray(out, np.float32), (4, n, 3)).reshape(4 * n, 3)   # a look can be one leg tall
     return np.vstack([legs, np.full((1, 3), laser, np.float32)])
+
+
+PYR_LASER = ("kick", "one", "offbeat", "gallop", "triplet", "tresillo", "bars", "eighths")
+
+
+def _jhash(n):
+    """lasershow.js hash(): the same numbers, so the Stage view's pyramids match the real ones."""
+    x = math.sin(n * 127.1 + 311.7) * 43758.5453
+    return x - math.floor(x)
+
+
+def str_hash(s):
+    """lasershow.js strHash()."""
+    h = 7
+    for c in str(s or ""):
+        h = (h * 31 + ord(c)) & 0xFFFFFFFF
+    return abs(h - (1 << 32) if h >= 1 << 31 else h)
+
+
+def pyramid_laser(ctx):
+    """The pyramids' on/off sky lasers in a drop: held for the first bar, then a rhythm per 4-bar
+    phrase picked by the track and the drop, never the same twice running, so drops don't repeat.
+    Mirrors pyramidLaserOn() in lasershow.js."""
+    sd, b = ctx["since_drop"], ctx["beat"]
+    if sd < 4:
+        return True
+    start, seed = round(b - sd), str_hash(ctx.get("title")) + (ctx.get("live") or 0)
+    last, pat = -1, 0
+    for i in range(int(sd // 16) + 1):
+        pat = int(_jhash(start * 0.37 + i * 13.1 + seed % 997) * (len(PYR_LASER) - 1))
+        if last >= 0 and pat >= last:
+            pat += 1
+        last = pat
+    f = lambda v: v - math.floor(v)
+    name = PYR_LASER[pat]
+    if name == "kick":
+        return f(b) < 0.5
+    if name == "one":
+        return f(b / 4) < 0.125
+    if name == "offbeat":
+        return 0.5 <= f(b) < 0.85
+    if name == "gallop":
+        return int(f(b) * 4) in (0, 2, 3)
+    if name == "triplet":
+        return f(b * 3) < 0.5
+    if name == "tresillo":
+        return int(f(b / 2) * 8) in (0, 3, 6)
+    if name == "bars":
+        return f(b / 8) < 0.5 or f(b) < 0.5
+    return f(b * 2) < 0.5
 
 
 def pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st):
@@ -383,13 +566,12 @@ def pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st):
     the feet over the last two beats)."""
     sd, hue = ctx["since_drop"], ctx["hue"]
     white = np.ones(3, np.float32)
-    alt = (order % 2) * 0.5
     if sd < 16:                                            # slam
-        base = hsv(hue + alt, 1.0, 0.5 + 0.5 * kick)
+        base = hsv(pal(ctx, order + int(sd // 4)) + 0 * x, 1.0, 0.5 + 0.5 * kick)
         ring = np.clip(1 - np.abs((1 - x) - frac) * 7, 0, 1)
         return lerp(base, white[None, None, :], ring * 0.75)
     if sd < 32:                                            # rockets
-        base = hsv(hue + alt + 0.1 * x, 1.0, 0.15 + 0.4 * kick)
+        base = hsv(pal(ctx, order) + 0.1 * x, 1.0, 0.15 + 0.4 * kick)
         sp = _spiral(order, x, turns=1, mirrored=mir, stations=st)
         head = min(1.0, frac * 2) * 1.1
         d = head - sp
@@ -397,13 +579,13 @@ def pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st):
         return lerp(base, white[None, None, :], tail)
     if sd < 48:                                            # bounce
         level = 0.25 + 0.75 * kick
-        bar_hue = hue + 0.5 * (int(sd // 4) % 2) + alt
+        bar_hue = pal(ctx, int(sd // 4) + order)
         on = x <= level
         cap = np.clip(1 - np.abs(x - level) * 25, 0, 1)
         out = np.where(on[..., None], hsv(bar_hue + 0.1 * x, 1.0, 0.3 + 0.7 * x), 0.0) + 0 * order[..., None]
         return lerp(out, white[None, None, :], cap)
     gate = ((beat * 4) % 1.0) < 0.5                        # peak
-    out = hsv(hue + 0.25 * (int(beat) % 4) + alt + 0.1 * x, 1.0, (0.45 + 0.55 * kick) if gate else 0.05)
+    out = hsv(pal(ctx, int(beat) + order) + 0.1 * x, 1.0, (0.45 + 0.55 * kick) if gate else 0.05)
     left = ctx.get("drop_bars", 16) * 4 - sd
     if left < 2:
         out = np.where((x <= 1 - left / 2)[..., None], white, out)
@@ -432,6 +614,7 @@ def pyramid_after(ctx, order, x, frac, beat, kick, mir, st, out):
 
 # ---------------------------------------------------------------- panel
 
+@unyellow
 def panel(ctx, w, h, role, state):
     s, hue = ctx["scene"], ctx["hue"]
     X, Y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
@@ -445,17 +628,17 @@ def panel(ctx, w, h, role, state):
     cols = stage_pos(role) + (X / max(1, w - 1) - 0.5) * role.get("span", 0.5)   # where each column stands
     if s == "INTRO":
         v = 0.08 + 0.04 * math.sin(2 * math.pi * beat / 8) + 0.5 * np.minimum(1.0, hit(ctx, role, cols) * drive(ctx)) * centre
-        return hsv(hue + X / w * 0.2, 0.8, v)
+        return hsv(layer(ctx, (cols + 1) / 2, Y / max(1, h - 1)), 0.8, v)
 
     if s in ("GROOVE", "OUTRO", "PAUSED"):
         fade = {"OUTRO": 0.8, "PAUSED": 0.3}.get(s, 1.0)
         k = 0.0 if s == "PAUSED" else np.minimum(1.0, hit(ctx, role, cols) * drive(ctx))
         v = (0.12 + 0.85 * k * centre) * fade
-        out = hsv(hue + X / w * 0.15, 1.0, v)
+        out = hsv(layer(ctx, (cols + 1) / 2, Y / max(1, h - 1)), 1.0, v)
         head = ((bwb - 1 + frac) / 4) * (w + 24)
         d = head - X
         comet = np.where((d >= 0) & (d < 24), np.exp(-d / 8), 0)
-        return lerp(out, hsv(hue + 0.5, 0.5, fade) * np.ones_like(out), comet)
+        return lerp(out, hsv(layer(ctx, (cols + 1) / 2, Y / max(1, h - 1), shift=1.5), 0.5, fade), comet)
 
     if s == "BREAKDOWN":
         return panel_breakdown(ctx, w, h, role, state, X, Y, beat)
@@ -481,7 +664,8 @@ def panel(ctx, w, h, role, state):
         radius = (sd % 1.0) * w * 0.6
         ring = np.exp(-np.abs(np.abs(X - w / 2) - radius) / 4)
         k = kick if sd < 4 else hit(ctx, role, cols)
-        base = hsv(hue + (0.5 if int(sd) % 2 else 0), 1.0, (0.3 + 0.7 * k) * 0.5) * np.ones((h, w, 1), np.float32)
+        blocks = (X // max(1, w // 6)).astype(np.int64) + int(sd)    # colour blocks across the panel, stepping each beat
+        base = hsv(pal(ctx, blocks), 1.0, (0.3 + 0.7 * k) * 0.5)
         return lerp(base, np.ones(3, np.float32), ring * 0.8)
 
     return np.zeros((h, w, 3), np.float32)
@@ -504,12 +688,12 @@ def par(ctx, role, state):
     if s == "IDLE":
         colour(ctx["t"] * 0.01, 0.9, 0.15)            # slow dim colour drift
     elif s == "INTRO":
-        colour(hue, 0.8, 0.12 + 0.6 * min(1.0, hit(ctx, role) * drive(ctx)))
+        colour(layer(ctx, place(role), 0.5), 0.8, 0.12 + 0.6 * min(1.0, hit(ctx, role) * drive(ctx)))
     elif s in ("GROOVE", "OUTRO", "PAUSED"):
         fade = {"OUTRO": 0.8, "PAUSED": 0.25}.get(s, 1.0)
         kick = 0.0 if s == "PAUSED" else hit(ctx, role)
         v = (0.18 + 0.82 * min(1.0, kick * drive(ctx))) * fade
-        colour(hue + 0.03 * (ctx["bar"] % 4), 1.0, v)
+        colour(layer(ctx, place(role), 0.5), 1.0, v)
         if bwb == 1:                                  # bar accent: push toward white
             out["w"] = 0.6 * kick * fade
             for k in ("r", "g", "b"):
@@ -537,8 +721,9 @@ def par(ctx, role, state):
         else:
             strobe = sd < 4 and ((sd * 2) % 1.0) > 0.5
             v = 0.0 if strobe else 0.35 + 0.65 * (kick if sd < 4 else hit(ctx, role))
-            colour(hue + (0.5 if int(sd) % 2 else 0.0), 1.0, v)
+            colour(pal(ctx, int(sd)), 1.0, v)
             out["uv"] = 0.3
+    out["r"], out["g"], out["b"] = unyellow_rgb([out["r"], out["g"], out["b"]]).tolist()
     return out
 
 
