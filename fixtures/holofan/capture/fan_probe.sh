@@ -17,7 +17,7 @@ if [ "$(ipconfig getoption en0 router)" = "$FAN" ]; then
   TD=$!; sleep 30; kill $TD 2>/dev/null
   [ -f "$HOME/fan-probe.pcap" ] && tcpdump -n -r "$HOME/fan-probe.pcap" 2>/dev/null | head -60
   echo "== TCP: all 65535 ports"
-  nmap -Pn -p- -T4 --min-rate 2000 --max-retries 1 -sT --stats-every 20s -oN "$HOME/fan-ports.txt" $FAN | tee /dev/tty
+  nmap -Pn -p- -T4 --min-rate 2000 --max-retries 1 -sT --stats-every 20s -oN "$HOME/fan-ports.txt" $FAN
   OPEN=$(grep -E "^[0-9]+/tcp +open" "$HOME/fan-ports.txt" | cut -d/ -f1 | paste -sd, -)
   echo "== open TCP ports: ${OPEN:-none}"
   [ -n "$OPEN" ] && nmap -Pn -sT -sV -p "$OPEN" $FAN
