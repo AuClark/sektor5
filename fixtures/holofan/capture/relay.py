@@ -41,7 +41,8 @@ while time.time() - t0 < LIMIT:
                     phone = a[0]; say(f"the app announced from {phone}")
             except OSError: pass
         elif s is srv:
-            fan, fa = srv.accept(); say(f"fan connected from {fa[0]}: stopped announcing")
+            fan, fa = srv.accept(); fan.setblocking(True)  # accepted sockets inherit non-blocking on macOS; sendall needs blocking
+            say(f"fan connected from {fa[0]}: stopped announcing")
         elif s is fan:
             d = fan.recv(65536)
             if not d: say("fan closed"); fan = None; break
@@ -59,7 +60,7 @@ while time.time() - t0 < LIMIT:
     else:
         if fan is not None and app is None and phone and now >= next_try:
             try:
-                app = socket.create_connection((phone, APP_PORT), 3); say(f"connected to the app at {phone}:{APP_PORT}: relaying")
+                app = socket.create_connection((phone, APP_PORT), 3); app.settimeout(None); say(f"connected to the app at {phone}:{APP_PORT}: relaying")
                 if fanbuf: app.sendall(fanbuf); fanbuf = b""
             except OSError as e:
                 say("can't reach the app yet:", e); next_try = now + 2
