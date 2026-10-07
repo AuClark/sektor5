@@ -33,10 +33,8 @@
     {
       "name": "pyramidL",
       "kind": "pyramid",
-      "host": "${S5_PYRAMID_L_HOST:-rave-box.local}",
+      "host": "${S5_PYRAMID_L_HOST:-rave-pyramid-l.local}",
       "leds_per_leg": 56,
-      "wiring": "mirrored",
-      "from_apex": true,
       "brightness": 0.8,
       "role": {
         "side": -1,
@@ -48,7 +46,7 @@
       "kind": "pyramid",
       "host": "${S5_PYRAMID_R_HOST:-rave-pyramid-r.local}",
       "leds_per_leg": 56,
-      "brightness": 0.7,
+      "brightness": 0.8,
       "role": {
         "side": 1,
         "pos": 1
