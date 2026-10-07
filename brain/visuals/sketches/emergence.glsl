@@ -5,7 +5,7 @@
 // maze slithers and rewires. Coloured zones, ragged rim and a hole, beat-locked.
 // Params are p_* uniforms; ranges and defaults are in emergence.json.
 uniform float p_waves, p_scale, p_thick, p_flow, p_turn, p_spin, p_beat,
-              p_size, p_hole, p_ragged, p_grow, p_mix, p_blobs, p_hue, p_sat, p_follow;
+              p_size, p_hole, p_ragged, p_grow, p_mix, p_blobs, p_hue, p_sat, p_follow, p_fill;
 
 #define TAU 6.2831853
 #define PI 3.1415927
@@ -56,6 +56,9 @@ vec3 content(vec2 uv) {
   float r = length(p);
   float rr = r + p_ragged * ((vnoise(p * 4.0 + 3.0) - 0.5) * 0.16 + (vnoise(p * 15.0) - 0.5) * 0.035);
   float R = p_size * (1.0 + p_grow * (u_sp - 0.5)) * (1.0 + 0.04 * k);
+  // Fill the screen: the rim goes out past the surface's corners (whatever its shape), so the maze
+  // covers it all and the zones become rings across the whole picture.
+  if (p_fill > 0.5) R = 0.5 * sqrt(u_aspect * u_aspect + 1.0) * (1.06 + 0.04 * k) + 0.12 * p_ragged;
   float inside = smoothstep(-u_px, u_px, R - rr);
   if (p_hole > 0.0) inside *= smoothstep(-u_px, u_px, rr - p_hole);
 

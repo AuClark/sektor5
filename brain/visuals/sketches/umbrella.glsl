@@ -189,5 +189,6 @@ vec3 content(vec2 uv) {
 
   col = applyUmbrellaRibs(col, uv);
   col = hueShift(max(col, 0.0), p_hue + p_follow * u_hue);
-  return clamp(col * p_bright, 0.0, 1.0);
+  // A soft lift for the projector, which crushes dark mids: darks and mids up about 1.8x, highlights eased, black stays black.
+  return clamp((1.0 - exp(-col * p_bright * 2.2)) / (1.0 - exp(-2.2)), 0.0, 1.0);
 }

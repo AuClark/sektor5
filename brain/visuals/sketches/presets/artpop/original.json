@@ -1,1 +1,14 @@
-{"octaves": 4, "warp": 1}
+{
+ "thick": 1.0,
+ "speed": 0.24,
+ "size": 1.0,
+ "small": 1,
+ "warp": 1.0,
+ "spec": 1.0,
+ "punch": 0.4,
+ "swell": 0.5,
+ "shift": 0.0,
+ "follow": 0,
+ "bright": 1.0,
+ "octaves": 4
+}

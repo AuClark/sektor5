@@ -748,6 +748,8 @@ class MapRenderer {
     if (!s.sketch || s.sketch === this.liveSketch) return this.progs.gen ? { prog: this.progs.gen, values: this.genLive } : null;
     const key = s.sketch + "|" + (s.preset || ""), e = this.sketches[key];
     if (!e) this._loadSketch(s.sketch, s.preset, key);
+    // A sketch that's gone (removed from the set) shows the Focus look rather than nothing.
+    if (e && e.missing) return this.progs.gen ? { prog: this.progs.gen, values: this.genLive } : null;
     if (!e || !e.prog) return null;
     if (e.frame !== this._frameNo) {                    // once a frame, however many surfaces show it
       e.frame = this._frameNo;
@@ -761,6 +763,7 @@ class MapRenderer {
     const base = visualsBase();
     try {
       const r = await fetch(`${base}/api/sketches/${encodeURIComponent(name)}` + (preset ? `?preset=${encodeURIComponent(preset)}` : ""));
+      if (r.status === 404) { this.sketches[key] = { missing: true }; return; }   // no such sketch any more: not retried
       if (!r.ok) throw new Error(`${name}: ${r.status}`);
       const { sketch: sk, values } = await r.json();
       const ids = sk.groups.flatMap(g => g.params.map(p => p.id));

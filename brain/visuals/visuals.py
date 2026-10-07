@@ -481,7 +481,7 @@ def preset_file(name, sk_name=None):
 def values_for(name, preset=None):
     """A sketch's values for a projection surface that shows it (not necessarily the active one):
     the live values if it's active, else as it was last left on the control page, or its defaults;
-    then a preset on top, if one is given."""
+    or, if a preset is given, that preset over the defaults."""
     sk = sketch if name == sketch["name"] else load_sketch(name)
     if name == sketch["name"]:
         vals = dict(values)
@@ -499,8 +499,10 @@ def values_for(name, preset=None):
     if preset and SAFE_NAME.match(preset):
         f = preset_file(preset, name)
         if f.is_file():
+            # Onto the defaults, as loading it on the Visuals page does: a preset lists only what it
+            # changes, so laid over the values last left it would come out as a different look.
             pv, _, _ = split_saved(json.loads(f.read_text()))
-            vals = clamp_values(sk, pv, vals)
+            vals = clamp_values(sk, pv, defaults(sk))
     return sk, vals
 
 

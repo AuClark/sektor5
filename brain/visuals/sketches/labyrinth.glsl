@@ -288,6 +288,8 @@ vec3 content(vec2 uv) {
     cD = vec3(0.05, 0.02, 0.08); hope = vec3(1.0, 0.5, 0.8); thr = vec3(0.4, 1.0, 0.5);
     mote = vec3(0.6, 1.0, 0.9); skyC = vec3(0.12, 0.05, 0.35); amb = vec3(0.02, 0.008, 0.035); edgeC = vec3(1.0, 0.5, 0.2);
   }
+  // The dark worlds' fill light, raised for the projector: walls away from a lamp read as stone, not black.
+  amb *= mix(3.5, 1.0, step(0.05, dot(amb, vec3(0.333))));
   // Hue and Follow turn the lights; the walls keep their world. Hue 0 with Follow 0 is the
   // world's own light. The trip blooms everything toward the show's colour.
   float hue = p_hue + u_hue * p_follow + 0.12 * C;
@@ -740,7 +742,9 @@ vec3 content(vec2 uv) {
   paper = mix(mix(paper, vec3(0.06, 0.05, 0.05), ink), thr, core * (1.0 - fogA));
   paper = mix(paper, mix(vec3(0.95, 0.92, 0.84), col, 0.75), itemHit);
   col = mix(col + mglow, paper, isP);
-  col = 1.0 - exp(-col * 1.6 * p_bright);
+  // A soft lift for the projector, which crushes dark mids: darks and mids up about 2.5x, highlights eased, black stays black.
+  col = 1.0 - exp(-col * 4.2 * p_bright);
+  col = pow(col, vec3(0.85));
   vec2 vq = uv - 0.5;
   return col * (1.0 - p_vign * dot(vq, vq) * 2.2);
 }
