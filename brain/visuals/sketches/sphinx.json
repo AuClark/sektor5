@@ -1,0 +1,26 @@
+{
+  "title": "Sphinx",
+  "about": "The Great Sphinx side on in soft clay, for the Dinki Dell doof: lying in the sand, its headdress striped gold and blue, a big sun behind its head and the pyramids small on the horizon. On the beat a ripple of light runs down the stripes and the eye looks round and blinks; through a build the eye glows hotter, and on the drop it fires lasers across the screen.",
+  "groups": [
+    {"name": "Scene", "params": [
+      {"id": "size",    "label": "Size",                         "min": 0.6, "max": 1.8, "step": 0.01, "default": 1},
+      {"id": "cx",      "label": "Across",                       "min": -0.4, "max": 0.4, "step": 0.005, "default": 0.0},
+      {"id": "cy",      "label": "Height",                       "min": -0.3, "max": 0.3, "step": 0.005, "default": 0.02},
+      {"id": "sun",     "label": "Sun",                          "min": 0, "max": 1, "step": 1, "default": 1},
+      {"id": "pyr",     "label": "Pyramids on the horizon",      "min": 0, "max": 1, "step": 1, "default": 1},
+      {"id": "stripes", "label": "Headdress stripes",            "min": 6, "max": 30, "step": 1, "default": 16}
+    ]},
+    {"name": "Motion", "params": [
+      {"id": "ripple",  "label": "Ripple down the stripes",      "min": 0, "max": 1.5, "step": 0.01, "default": 0.8},
+      {"id": "look",    "label": "Eye looks round",              "min": 0, "max": 1, "step": 0.01, "default": 1},
+      {"id": "beat",    "label": "Beat punch",                   "min": 0, "max": 1, "step": 0.01, "default": 0.7},
+      {"id": "laser",   "label": "Laser eyes (build and drop)",  "min": 0, "max": 1.5, "step": 0.01, "default": 1},
+      {"id": "drop",    "label": "Drop",                         "min": 0, "max": 1, "step": 0.01, "default": 1}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "pal",     "label": "Palette (0 desert, 1 the cover, 2 night, 3 pink)", "min": 0, "max": 3, "step": 1, "default": 0},
+      {"id": "follow",  "label": "Shift by show hue",            "min": 0, "max": 1, "step": 1, "default": 0},
+      {"id": "bright",  "label": "Brightness",                   "min": 0.5, "max": 1.5, "step": 0.01, "default": 1}
+    ]}
+  ]
+}

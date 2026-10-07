@@ -243,6 +243,19 @@ Presets in `sketches/presets/NAME/*.json` ship with the sketch in git and show i
 
 Shaders can't draw text by themselves, so `tools/glsltext.py` writes a 5x7 pixel font and a list of messages into a sketch. The sketch lists its messages on a `// @messages: OBEY|CONSUME|WAKE UP` line and has an empty `// <text>` ... `// </text>` block; running `python3 brain/visuals/tools/glsltext.py brain/visuals/sketches/subliminal.glsl` fills the block. To change the words, edit the `@messages` line and run it again. The block gives the shader `textCov()` (a message), `charCov()` (one character), `msgLen()`, `msgChar()` and `CH_A` ... `CH_9` for drawing live numbers. Letters, digits, space and `: - . ! ? / # '` only.
 
+## Dinki Dell set
+
+Four sketches for the Dinki Dell doof, after its cover (theme **Dinki Dell**). They share one look, soft clay on bright flat colour: every shape is a simple distance field (circles, capsules, triangles, rounded boxes), shaded by how its rim faces a light from the top left, with a soft shadow down and to the right. They're cheap: each object only works out its detail on the pixels near it, so most of the screen is a flat colour (1.3–2.9 ms a 1920×1080 frame in Chrome here, against 3.5 for `wavelength`). The cover's blue tube runs through all of them.
+
+| Sketch | What it is | On the music | Presets |
+|---|---|---|---|
+| `doof` | The holding screen: DINKI arched, DELL and doof in lilac (stroke letters, not a font), the eye in its sunburst, the quilted bee, the golden disc of glyphs and the blue tube, on lime. **Show** puts one of the three on its own, big and centred, for a pyramid face or a small surface | The letters hop in turn through the bar, the rays pulse and turn, the bee flaps on the kick, the eye looks round and blinks; everything swells and the rays burst on the drop | cover, night, pink, sky, eye, bee, disc |
+| `pyramids` | The three of Giza under a big sun with fat turning rays, rolling dunes, the Nile as the blue tube, and the capstone (the eye in a golden triangle) floating over the great pyramid | A light climbs each pyramid's edges in turn on beats 1, 2 and 3, the stone courses glinting as it passes; the capstone comes down through a build, lands on the drop and sends a beam into the sky | desert, cover, night, pink |
+| `sphinx` | The Sphinx side on in the sand, its headdress striped gold and blue, a big sun behind its head, the pyramids small on the horizon | A ripple of light runs down the stripes on the beat, the eye looks round and blinks; the eye glows red through a build and fires lasers across the screen on the drop | desert, cover, night, pink |
+| `astronaut` | A chunky astronaut floating on the tether (the blue tube), a ringed planet and a moon behind, stars | One arm waves, the chest buttons light in turn, the stars twinkle on the beat; the visor reflects a studio spotlight (it was filmed on a set). On the drop it does a full flip, the visor shows the eye and the stars burst | cover, space, pink, sky |
+
+Each has a palette (the cover's lime, night, pink and a fourth) and Follow the show's colour. They fit themselves to the surface: a narrower one gets a smaller copy rather than a cropped one.
+
 ## Max Cooper set
 
 Simplified takes on five Max Cooper videos, each a sketch with presets:

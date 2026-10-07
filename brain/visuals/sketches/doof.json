@@ -1,0 +1,27 @@
+{
+  "title": "Doof",
+  "about": "The Dinki Dell doof holding screen, after the event's cover: DINKI DELL doof in lilac, the eye in its sunburst, the quilted bee and the golden disc of glyphs, with the blue tube wandering through, all soft clay on lime. The letters hop in turn through the bar, the rays pulse and the bee flaps on the kick, the eye looks round and blinks; everything swells and the rays burst on the drop.",
+  "groups": [
+    {"name": "Layout", "params": [
+      {"id": "show",   "label": "Show (0 the cover, 1 the eye, 2 the bee, 3 the disc)", "min": 0, "max": 3, "step": 1, "default": 0, "kind": "fixed"},
+      {"id": "size",   "label": "Size",                          "min": 0.5, "max": 1.6, "step": 0.01, "default": 1.15},
+      {"id": "cy",     "label": "Height",                        "min": -0.3, "max": 0.3, "step": 0.005, "default": 0.04},
+      {"id": "text",   "label": "DINKI DELL doof",               "min": 0, "max": 1, "step": 1, "default": 1, "kind": "fixed"},
+      {"id": "icons",  "label": "The eye, the bee and the disc", "min": 0, "max": 1, "step": 1, "default": 1, "kind": "fixed"},
+      {"id": "tube",   "label": "The blue tube",                 "min": 0, "max": 1, "step": 1, "default": 1}
+    ]},
+    {"name": "Motion", "params": [
+      {"id": "hop",    "label": "Letters hop in turn",           "min": 0, "max": 1.5, "step": 0.01, "default": 0.8},
+      {"id": "bob",    "label": "Float",                         "min": 0, "max": 2, "step": 0.01, "default": 1},
+      {"id": "spin",   "label": "Rays turn (per 64 beats)",      "min": -2, "max": 2, "step": 0.01, "default": 0.5, "kind": "rate"},
+      {"id": "beat",   "label": "Beat punch",                    "min": 0, "max": 1, "step": 0.01, "default": 0.7},
+      {"id": "drop",   "label": "Swell on the drop",             "min": 0, "max": 1, "step": 0.01, "default": 1}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "bg",     "label": "Ground (0 lime, 1 pink, 2 sky, 3 night)", "min": 0, "max": 3, "step": 1, "default": 0},
+      {"id": "ink",    "label": "Neon inks",                     "min": 0, "max": 1, "step": 1, "default": 0},
+      {"id": "follow", "label": "Shift by show hue",             "min": 0, "max": 1, "step": 1, "default": 0},
+      {"id": "bright", "label": "Brightness",                    "min": 0.5, "max": 1.5, "step": 0.01, "default": 1}
+    ]}
+  ]
+}
