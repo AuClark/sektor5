@@ -243,6 +243,19 @@ Presets in `sketches/presets/NAME/*.json` ship with the sketch in git and show i
 
 Shaders can't draw text by themselves, so `tools/glsltext.py` writes a 5x7 pixel font and a list of messages into a sketch. The sketch lists its messages on a `// @messages: OBEY|CONSUME|WAKE UP` line and has an empty `// <text>` ... `// </text>` block; running `python3 brain/visuals/tools/glsltext.py brain/visuals/sketches/subliminal.glsl` fills the block. To change the words, edit the `@messages` line and run it again. The block gives the shader `textCov()` (a message), `charCov()` (one character), `msgLen()`, `msgChar()` and `CH_A` ... `CH_9` for drawing live numbers. Letters, digits, space and `: - . ! ? / # '` only.
 
+## Dinki Dell set
+
+Four sketches for the Dinki Dell doof, after its cover (theme **Dinki Dell**), **made for a triangle**: the pyramid faces. Each is one subject, centred where a triangle has the most room (about a third up from the base), on a flat colour, with nothing near the sides or the top, so a triangle with its sides trimmed still shows it all. They share the cover's look, soft clay on bright flat colour: every shape is a simple distance field (circles, capsules, triangles, rounded boxes), shaded by how its rim faces a light from the top left, with a soft shadow. They're cheap, 1.7–2.5 ms a 1920×1080 frame in Chrome here (`wavelength` 3.3).
+
+| Sketch | What it is | On the music | Presets |
+|---|---|---|---|
+| `doof` | The holding screen: one icon big in the middle (**Icon**: the eye in its sunburst, the quilted bee or the golden disc of glyphs) with DINKI DELL and doof across the bottom in lilac (stroke letters, not a font) | The letters hop in turn through the bar, the rays pulse and turn, the bee flaps on the kick, the eye looks round and blinks; the icon swells and the rays burst on the drop | eye, bee, disc, night |
+| `pyramids` | One pyramid (a pyramid on a pyramid) with a sun behind its tip and the capstone, the eye in a golden triangle, floating above | A band of light sweeps up the faces on every beat, the courses glinting in it; the capstone comes down through a build, lands on the drop and beams up to the apex | desert, cover, night, pink |
+| `sphinx` | The Sphinx face on as a bust: the headdress flaring to the shoulders like a pyramid, striped gold and blue, the cobra, the false beard, a broad striped collar, a sun behind | A ripple of light runs down the stripes on the beat, the eyes look round and blink; they glow red through a build and blaze with laser starbursts on the drop | desert, cover, night, pink |
+| `astronaut` | A chunky astronaut floating in the middle, a few stars | One arm waves, the chest buttons light in turn, the stars twinkle; the visor reflects a studio spotlight (it was filmed on a set). On the drop it does a full flip, the visor shows the eye and the stars burst | cover, space, pink, sky |
+
+Each has four palettes (the cover's lime, night and two more), Size and Height, and Follow the show's colour.
+
 ## Max Cooper set
 
 Simplified takes on five Max Cooper videos, each a sketch with presets:

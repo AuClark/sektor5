@@ -1,0 +1,23 @@
+{
+  "title": "Doof",
+  "about": "The Dinki Dell doof holding screen, after the event's cover, made for a triangle: one icon big in the middle (the eye in its sunburst, the quilted bee or the golden disc) with DINKI DELL and doof across the wide part at the bottom, soft clay on a flat colour. The letters hop in turn, the rays pulse, the bee flaps on the kick, the eye looks and blinks; the icon swells and the rays burst on the drop.",
+  "groups": [
+    {"name": "Layout", "params": [
+      {"id": "show",   "label": "Icon (0 the eye, 1 the bee, 2 the disc)", "min": 0, "max": 2, "step": 1, "default": 0, "kind": "fixed"},
+      {"id": "size",   "label": "Size",                        "min": 0.6, "max": 1.4, "step": 0.01, "default": 1},
+      {"id": "cy",     "label": "Height",                      "min": -0.15, "max": 0.15, "step": 0.005, "default": 0},
+      {"id": "text",   "label": "DINKI DELL doof",             "min": 0, "max": 1, "step": 1, "default": 1, "kind": "fixed"}
+    ]},
+    {"name": "Motion", "params": [
+      {"id": "hop",    "label": "Letters hop in turn",         "min": 0, "max": 1.5, "step": 0.01, "default": 0.8},
+      {"id": "spin",   "label": "Turn (per 64 beats)",         "min": -2, "max": 2, "step": 0.01, "default": 0.5, "kind": "rate"},
+      {"id": "beat",   "label": "Beat punch",                  "min": 0, "max": 1, "step": 0.01, "default": 0.7},
+      {"id": "drop",   "label": "Swell on the drop",           "min": 0, "max": 1, "step": 0.01, "default": 1}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "pal",    "label": "Palette (0 the cover, 1 night, 2 pink, 3 sky)", "min": 0, "max": 3, "step": 1, "default": 0},
+      {"id": "follow", "label": "Shift by show hue",           "min": 0, "max": 1, "step": 1, "default": 0},
+      {"id": "bright", "label": "Brightness",                  "min": 0.5, "max": 1.5, "step": 0.01, "default": 1}
+    ]}
+  ]
+}
