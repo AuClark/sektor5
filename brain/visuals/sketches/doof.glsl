@@ -1,11 +1,12 @@
 // Doof: the Dinki Dell doof holding screen, after the event's cover, made for a triangle (a pyramid
-// face): one icon big in the middle (the eye in its sunburst, the quilted bee or the golden disc),
+// face): one icon big in the middle, turning like a coin every few bars from the eye in its sunburst to
+// the quilted bee to the golden disc (or one of them held),
 // DINKI DELL and doof across the wide part at the bottom, soft clay on a flat colour. Nothing sits
 // near the sides or the top, so a trimmed triangle still shows it all.
 // On the beat: the letters hop in turn, the rays pulse, the bee flaps, the eye looks and blinks.
 // On the drop: the icon swells and the rays burst.
 // Params are p_* uniforms; ranges and defaults are in doof.json.
-uniform float p_show, p_size, p_cy, p_text, p_hop, p_spin, p_beat, p_drop, p_pal, p_follow, p_bright,
+uniform float p_show, p_every, p_size, p_cy, p_text, p_hop, p_spin, p_beat, p_drop, p_pal, p_follow, p_bright,
               p_trip, p_echo, p_melt, p_cycle;
 
 #define TAU 6.2831853
@@ -156,13 +157,24 @@ vec3 content(vec2 uv) {
   float R = 0.235 * p_size * (1.0 + 0.04 * k + 0.12 * dr);
   vec2 c = vec2(0.0, -0.02 + p_cy);
   vec3 col = spiral(BG, mix(BG, INK, 0.45), p - c, p_trip) * (1.0 + 0.08 * dr);   // lime and lilac on the cover
+  // Clean rings rippling out from the middle on the beat (the shapes' own outlines came out lumpy).
+  col = mix(col, INK, clamp(echo(length(p - c) - R * 1.05) * p_echo, 0.0, 1.0) * 0.8);
   vec2 e = (melt(p, p_melt) - c) / R;
-  float show = floor(p_show + 0.5);
+  // Which icon: 1 the eye, 2 the bee, 3 the disc, or 0 all three in turn, every so many bars. At each
+  // change it turns like a coin over a beat, edge on at the downbeat, and comes round as the next one.
+  float show = floor(p_show + 0.5) - 1.0;
+  if (show < 0.0) {
+    float per = 4.0 * max(1.0, p_every), bb = barBeat();
+    float n = floor(bb / per), ph = bb - n * per;
+    show = mod(n, 3.0);
+    // Closing over the half beat before the 1, edge on at the 1, opening as the next one over the half beat after.
+    float sx = ph < 0.5 ? sin(PI * ph) : ph > per - 0.5 ? sin(PI * (per - ph)) : 1.0;
+    e.x /= max(sx, 0.03);
+  }
   if (dot(e, e) < 2.2) {
     if (show < 0.5) {                                                  // the eye in its sunburst
       vec2 er = rot(u_beat * p_spin * TAU / 64.0) * e;
       float pulse = 0.08 * k + 0.25 * dr;
-      col = mix(col, INK, clamp(echo(rays(er, pulse) * R) * p_echo, 0.0, 1.0));   // echoes rippling out of the sunburst
       col = shade(col, rays(rot(u_beat * p_spin * TAU / 64.0) * (e - vec2(0.07, -0.1)), pulse) * R);
       col = clay(col, PEACH, rays(er, pulse) * R, rays(er + LGT * 0.06, pulse) * R);
       vec2 A = vec2(0.0, 0.44), B = vec2(0.52, -0.38), C = vec2(-0.52, -0.38);
@@ -185,7 +197,6 @@ vec3 content(vec2 uv) {
       float flap = 1.0 - 0.45 * exp(-10.0 * u_frac) * step(0.01, p_beat);
       float w, wl, ws;
       float bd = bee(e, flap, w), bdl = bee(e + LGT * 0.05, flap, wl), bds = bee(e - vec2(0.06, -0.09), flap, ws);
-      col = mix(col, INK, clamp(echo(min(bd, w) * R) * p_echo, 0.0, 1.0));
       col = shade(col, min(bds, ws) * R);
       vec2 g = fract(e * 26.0) - 0.5;
       vec3 quilt = MAROON * (0.92 + 0.16 * (1.0 - smoothstep(0.15, 0.35, length(g))));
@@ -193,7 +204,6 @@ vec3 content(vec2 uv) {
       col = clay(col, quilt, bd * R, bdl * R);
     } else {                                                           // the golden disc, turning slowly
       float dd = (length(e) - 0.92) * R;
-      col = mix(col, INK, clamp(echo(dd) * p_echo, 0.0, 1.0));
       col = shade(col, (length(e - vec2(0.06, -0.09)) - 0.92) * R);
       col = clay(col, GOLD, dd, (length(e + LGT * 0.06) - 0.92) * R);
       if (dd < 0.0) {
