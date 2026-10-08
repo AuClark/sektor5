@@ -41,7 +41,7 @@ vec3 rotHue(vec3 c, float a) {
 // The ground as a two-tone spiral (bg and b2) turning out of p = 0, rings flowing outward a beat at a time.
 vec3 spiral(vec3 bg, vec3 b2, vec2 p, float amt) {
   if (amt <= 0.0) return bg;
-  float r = length(p) + 1e-3, a = atan(p.y, p.x), lr = log(r);
+  float r = length(p) + 1e-3, a = atan(p.y, p.x + 1e-5), lr = log(r);
   float arms = sin(a * 5.0 + lr * 5.0 - u_beat * 0.785);               // five arms, a twentieth of a turn a beat
   float rings = sin(lr * 9.0 - u_beat * 3.1416);                         // a ring of light out from the middle every two beats
   float m = smoothstep(-0.05, 0.05, arms) * clamp(amt, 0.0, 1.0);
@@ -97,8 +97,10 @@ vec3 content(vec2 uv) {
   // ---- hyperspace: star streaks flowing out from the astronaut, faster on the trip, rushing on the drop
   if (p_stars > 0.0) {
     vec2 s0 = p - vec2(0.0, -0.085);
-    float r = length(s0), ang = atan(s0.y, s0.x);
-    vec2 g = vec2(ang / TAU * 36.0, log(r + 0.02) * 6.0 - u_beat * (0.4 + 1.2 * p_trip) * (1.0 + 2.0 * dr));
+    float r = length(s0), ang = atan(s0.y, s0.x + 1e-5);
+    // Steady speed, plus a rush that starts from nothing on the drop (u_since), so the stars never jump.
+    float flow = u_beat * 0.9 + (abs(u_scene - 7.0) < 0.5 ? u_since * 1.8 * p_drop : 0.0);
+    vec2 g = vec2(ang / TAU * 36.0, log(r + 0.02) * 6.0 - flow);
     vec2 cell = floor(g), f = fract(g) - 0.5;
     float hh = hash(cell);
     if (hh > 0.72) {
@@ -139,7 +141,7 @@ vec3 content(vec2 uv) {
     float vd = sdEll(v, vec2(0.125, 0.095)) * fit;
     if (vd < u_px) {
       vec3 vc = mix(VIS2, VIS, smoothstep(-0.09, 0.08, v.y - v.x * 0.4));
-      vc = mix(vc, hsv(atan(v.y, v.x) / TAU * 2.0 + length(v) * 10.0 - u_beat * 0.5, 0.65, 0.95), 0.55 * p_trip);   // a swirl of colour in the glass
+      vc = mix(vc, hsv(atan(v.y, v.x + 1e-5) / TAU * 2.0 + length(v) * 10.0 - u_beat * 0.5, 0.65, 0.95), 0.55 * p_trip);   // a swirl of colour in the glass
       // The reflection: a spotlight cone swinging across the glass, the set's lights at the top.
       float sw = 0.06 * sin(u_beat * PI / 4.0);
       float cone = (1.0 - smoothstep(0.0, 0.02, abs(v.x - sw - (v.y - 0.08) * 0.5) - (0.08 - v.y) * 0.25)) * step(v.y, 0.08);

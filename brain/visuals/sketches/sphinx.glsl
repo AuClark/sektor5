@@ -38,7 +38,7 @@ vec3 rotHue(vec3 c, float a) {
 // The ground as a two-tone spiral (bg and b2) turning out of p = 0, rings flowing outward a beat at a time.
 vec3 spiral(vec3 bg, vec3 b2, vec2 p, float amt) {
   if (amt <= 0.0) return bg;
-  float r = length(p) + 1e-3, a = atan(p.y, p.x), lr = log(r);
+  float r = length(p) + 1e-3, a = atan(p.y, p.x + 1e-5), lr = log(r);
   float arms = sin(a * 5.0 + lr * 5.0 - u_beat * 0.785);               // five arms, a twentieth of a turn a beat
   float rings = sin(lr * 9.0 - u_beat * 3.1416);                         // a ring of light out from the middle every two beats
   float m = smoothstep(-0.05, 0.05, arms) * clamp(amt, 0.0, 1.0);
@@ -112,7 +112,8 @@ vec3 content(vec2 uv) {
   q = melt(q, p_melt);
   float nd = nemes(q);
   col = shade(col, nemes(q - vec2(0.03, -0.02)));
-  float sy = (q.y + u_beat * 0.03 * p_trip) * p_stripes * 2.0;          // the stripes flow down the cloth on the trip
+  // The stripes flow down the cloth at a steady speed (a speed a knob can move would jump them along).
+  float sy = (q.y + u_beat * 0.03 * step(0.001, p_trip)) * p_stripes * 2.0;
   vec3 band2 = mix(LAPIS, hsv(floor(sy) * 0.13 - u_beat / 32.0, 0.75, 0.95), 0.8 * p_trip);   // and turn rainbow
   vec3 cloth = mix(GOLD, band2, step(0.5, fract(sy)));
   float rip = p_ripple * exp(-abs(fract(-q.y * 1.6 - u_frac) - 0.5) * 10.0) * (0.4 + 0.6 * k);
@@ -151,12 +152,12 @@ vec3 content(vec2 uv) {
     col = mix(col, vec3(0.1, 0.08, 0.12), fill(sdSeg(em, vec2(-0.025, 0.026), vec2(0.03, 0.03)) - 0.003));   // the brow
     col = mix(col, vec3(0.99, 0.97, 0.92), fill(ed));
     vec2 il = e - look;                                                // the iris: a rainbow spiral on the trip, red in a build
-    vec3 ic = mix(vec3(0.15, 0.1, 0.08), hsv(atan(il.y, il.x) / TAU + length(il) * 60.0 - u_beat * 0.5, 0.8, 1.0), 0.8 * p_trip);
+    vec3 ic = mix(vec3(0.15, 0.1, 0.08), hsv(atan(il.y, il.x + 1e-5) / TAU + length(il) * 60.0 - u_beat * 0.5, 0.8, 1.0), 0.8 * p_trip);
     if (ed < 0.0) col = mix(col, mix(ic, LASER, max(build, dr)), fill(length(il) - 0.009));
     col += LASER * exp(-length(e) / 0.018) * (0.7 * build + 1.4 * dr) * p_laser;
     // The drop: a starburst of laser lines out of each eye, turning, flickering on the 16ths.
     if (dr > 0.01 && p_laser > 0.0) {
-      float a = atan(e.y, e.x) + u_beat * 0.3 * sx, n = 8.0, sec = TAU / n;
+      float a = atan(e.y, e.x + 1e-5) + u_beat * 0.3 * sx, n = 8.0, sec = TAU / n;
       float j = floor(a / sec + 0.5);
       vec2 r = vec2(cos(a - j * sec), sin(a - j * sec)) * length(e);
       float beam = (exp(-abs(r.y) / 0.004) * 1.4 + exp(-abs(r.y) / 0.02) * 0.35) * smoothstep(0.02, 0.05, r.x) * exp(-r.x / 0.6);

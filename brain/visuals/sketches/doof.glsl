@@ -39,7 +39,7 @@ vec3 rotHue(vec3 c, float a) {
 // The ground as a two-tone spiral (bg and b2) turning out of p = 0, rings flowing outward a beat at a time.
 vec3 spiral(vec3 bg, vec3 b2, vec2 p, float amt) {
   if (amt <= 0.0) return bg;
-  float r = length(p) + 1e-3, a = atan(p.y, p.x), lr = log(r);
+  float r = length(p) + 1e-3, a = atan(p.y, p.x + 1e-5), lr = log(r);
   float arms = sin(a * 5.0 + lr * 5.0 - u_beat * 0.785);               // five arms, a twentieth of a turn a beat
   float rings = sin(lr * 9.0 - u_beat * 3.1416);                         // a ring of light out from the middle every two beats
   float m = smoothstep(-0.05, 0.05, arms) * clamp(amt, 0.0, 1.0);
@@ -113,7 +113,7 @@ float title(vec2 p, float y, float h) {
 
 // ---------------------------------------------------------------- the three icons, each about radius 1
 float rays(vec2 q, float pulse) {
-  float a = atan(q.y, q.x), sec = TAU / 20.0, i = floor(a / sec + 0.5);
+  float a = atan(q.y, q.x + 1e-5), sec = TAU / 20.0, i = floor(a / sec + 0.5);
   vec2 r = rot(-i * sec) * q;
   float sway = 0.1 * p_trip * sin(i * 1.7 + u_beat * PI * 0.5);       // the rays undulate, a wave running round them
   return sdSeg(r, vec2(0.48, 0.0), vec2(0.86 + 0.1 * sin(i * 2.4) + sway + pulse, 0.0)) - 0.075;
@@ -188,7 +188,7 @@ vec3 content(vec2 uv) {
       if (white < 0.0) {
         vec2 look = 0.06 * vec2(sin(u_beat * 0.37), 0.4 * sin(u_beat * 0.23)) * (1.0 - dr);
         vec2 il = ey - look;                                             // the iris: a rainbow spiral turning on the trip
-        vec3 ic = mix(IRIS, hsv(atan(il.y, il.x) / TAU + length(il) * 6.0 - u_beat * 0.25, 0.7, 1.0), 0.75 * p_trip);
+        vec3 ic = mix(IRIS, hsv(atan(il.y, il.x + 1e-5) / TAU + length(il) * 6.0 - u_beat * 0.25, 0.7, 1.0), 0.75 * p_trip);
         col = mix(col, ic * (0.8 + 0.3 * clamp(1.0 - length(il - vec2(-0.04, 0.04)) * 6.0, 0.0, 1.0)), fill((length(il) - 0.145) * R));
         col = mix(col, vec3(0.08, 0.1, 0.14), fill((length(ey - look) - 0.068 * (1.0 - 0.3 * dr)) * R));
         col = mix(col, vec3(1.0), fill((length(ey - look - vec2(-0.05, 0.05)) - 0.026) * R));

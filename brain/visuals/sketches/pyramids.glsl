@@ -34,7 +34,7 @@ vec3 rotHue(vec3 c, float a) {
 // The ground as a two-tone spiral (bg and b2) turning out of p = 0, rings flowing outward a beat at a time.
 vec3 spiral(vec3 bg, vec3 b2, vec2 p, float amt) {
   if (amt <= 0.0) return bg;
-  float r = length(p) + 1e-3, a = atan(p.y, p.x), lr = log(r);
+  float r = length(p) + 1e-3, a = atan(p.y, p.x + 1e-5), lr = log(r);
   float arms = sin(a * 5.0 + lr * 5.0 - u_beat * 0.785);               // five arms, a twentieth of a turn a beat
   float rings = sin(lr * 9.0 - u_beat * 3.1416);                         // a ring of light out from the middle every two beats
   float m = smoothstep(-0.05, 0.05, arms) * clamp(amt, 0.0, 1.0);
