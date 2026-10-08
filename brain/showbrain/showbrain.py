@@ -175,6 +175,8 @@ class Engine:
         self.hold = False
         self.strobe = False
         self.forced = None              # {"kind": "build"|"drop", "player", "start", "drop"} in beats
+        self.build_style = None         # latched build style (looks.BUILD_STYLES), else one picked per build
+        self.build_key = self.build_pick = None
         # Performance layer (Commander pads), applied on top of the auto show.
         self.strobe_div = 2             # strobe flashes per beat; 0 = free-running 12 Hz
         acfg = CONFIG.get("auto_strobe", {})
@@ -469,8 +471,19 @@ class Engine:
     def save_overrides(self):
         self.overrides_path.write_text(json.dumps(self.overrides, indent=1))
 
+    def _build_style(self, ctx, drop):
+        """The Commander's, else one per build, by the track and the drop, never the last one again."""
+        if self.build_style:
+            return self.build_style
+        key = (ctx.get("title"), round(drop))
+        if key != self.build_key:
+            opts = [s for s in looks.BUILD_STYLES if s != self.build_pick]
+            self.build_key, self.build_pick = key, opts[looks.str_hash(f"{key[0]}:{key[1]}") % len(opts)]
+        return self.build_pick
+
     def _build(self, ctx, beat, start, drop, p):
         ctx["beats_to_drop"] = drop - beat
+        ctx.update(build_t=beat - start, build_len=drop - start, build_style=self._build_style(ctx, drop))
         if drop - beat <= 1.0:
             ctx["scene"] = "PREDROP"
             return ctx
@@ -714,6 +727,11 @@ class Engine:
             if v not in (None, "AUTO", *looks.PLAYS):
                 return {"ok": False, "error": f"unknown play {v}"}
             self.play = None if v in (None, "AUTO") else v
+        elif cmd == "build_style":
+            v = c.get("value")
+            if v not in (None, "AUTO", *looks.BUILD_STYLES):
+                return {"ok": False, "error": f"unknown build style {v}"}
+            self.build_style = None if v in (None, "AUTO") else v
         elif cmd == "palette":
             v = c.get("value") or {}
             if v.get("mode") in ("auto", "lock", "cycle", "visuals"):
@@ -1059,7 +1077,7 @@ def main():
             "intensity": engine.intensity, "hold": engine.hold, "strobe": engine.strobe,
             "strobe_div": engine.strobe_div, "auto_strobe": engine.auto_strobe,
             "strobe_auto": None if not engine.strobe_now else dict(zip(("div", "duty", "phase"), engine.strobe_now)), "wave_lights": engine.wave_mode, "wave_now": looks.wave_on(ctx), "blinder": engine.blinder, "black_hold": engine.black_hold,
-            "look": engine.look, "play": looks.play_of(ctx), "play_lock": engine.play, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
+            "look": engine.look, "play": looks.play_of(ctx), "play_lock": engine.play, "build_style_lock": engine.build_style, "palette": {"mode": engine.palette_mode, "hue": engine.palette_hue},
             "visual": None if not engine.visual else {"hue": round(engine.visual["hue"], 3), "sat": round(engine.visual["sat"], 2),
                                                       "age_s": round(time.time() - engine.visual["t"], 1)},
             "speed": engine.speed, "tap_bpm": round(engine.tap_bpm, 1),

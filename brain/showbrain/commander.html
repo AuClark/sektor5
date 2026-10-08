@@ -193,6 +193,7 @@
     <button class="big" style="background:var(--warn);border-color:var(--warn)" onclick="cmd('build', +$('bbars').dataset.v)">Build <span id="bbl">4</span> bars</button>
   </div>
   <div class="seg" id="bbars" data-v="4" style="margin-top:8px"><button data-v="2">2</button><button data-v="4">4</button><button data-v="8">8</button><button data-v="16">16</button></div>
+  <div class="seg" id="bstyle" style="margin-top:8px" title="How builds look: Auto picks one per build, never the same twice running"><button data-v="AUTO">Auto</button><button data-v="rise">Rise</button><button data-v="sweep">Sweep</button><button data-v="converge">Converge</button><button data-v="swell">Swell</button><button data-v="stutter">Stutter</button></div>
   <div class="grid" style="margin-top:10px">
     <button id="hold" onclick="cmd('hold')">Hold</button>
     <button onclick="cmd('clear')">Cancel build</button>
@@ -255,6 +256,7 @@ segs('speed', v => cmd('speed', +v));
 segs('pmode', v => cmd('palette', {mode: v}));
 segs('bbars', v => { $('bbars').dataset.v = v; $('bbl').textContent = v; segOn('bbars', v); });
 segOn('bbars', 4);
+segs('bstyle', v => cmd('build_style', v));
 document.querySelectorAll('[data-look]').forEach(b => b.onclick = () => cmd('look', b.dataset.look));
 
 // Hold pads: on while pressed (pointer capture keeps them on if the finger slides off).
@@ -337,6 +339,7 @@ async function poll() {
     document.querySelectorAll('#beats div').forEach((b, i) => b.classList.toggle('on', S.bwb === i + 1 && S.scene !== 'IDLE'));
     $('hold').classList.toggle('on', !!S.hold);
     $('black').classList.toggle('on', S.mode === 'blackout');
+    segOn('bstyle', S.build_style_lock || 'AUTO');
     segOn('mode', S.mode); segOn('follow', S.follow); segOn('sdiv', S.strobe_div); segOn('wavel', S.wave_lights);
     $('waveinfo').textContent = S.wave_now ? '· drawing it now' : S.wave_lights === 'auto' ? '· some phrases' : ''; segOn('speed', S.speed);
     const mx = S.mix || {};

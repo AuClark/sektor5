@@ -387,6 +387,9 @@ def strip(ctx, n, role, state):
     if s == "BREAKDOWN":
         return strip_after(ctx, n, role, x, frac, beat, kick, strip_breakdown(ctx, n, role, state, x, beat))
 
+    if s in ("BUILD", "HOLD") and ctx.get("build_style", "rise") != "rise":
+        return hsv(*build_field(ctx, place(role), x))
+
     if s in ("BUILD", "HOLD"):
         p = ctx["progress"]
         rate = 1 if p < 0.5 else 2 if p < 0.75 else 4 if p < 0.9 else 8
@@ -482,6 +485,75 @@ def strip_drop(ctx, n, role, x, frac, bwb, beat, kick):
     if left < 2:
         out = np.where((x <= 1 - left / 2)[:, None], 1.0, out).astype(np.float32)
     return out
+
+
+# ---------------------------------------------------------------- build styles
+# Each build picks a style (showbrain: per build, never the same twice running, or latched in the
+# Commander), so builds don't all look alike. "rise" is the original: each fixture fills up as the
+# strobe doubles (the per-fixture code below). The others are one field across the rig, at stage
+# place u (0 left .. 1 right) and height x (0 .. 1), worked out the same way by every fixture:
+#   sweep     a bright band scanning across the stage and back, faster and whiter towards the drop
+#   converge  hits from the outside fixtures in to the middle every pulse; late on, all together
+#   swell     slow saturated breaths that shorten and brighten, hue turning; flicker in the last bar
+#   stutter   left and right trade colour hits on a tightening grid, colours stepping each pair
+# Their pulse rate climbs the same ladder as rise: 1, 2, 4, 8 a beat at 0, 50, 75, 90% of the build.
+
+BUILD_STYLES = ("rise", "sweep", "converge", "swell", "stutter")
+
+
+def build_rate(p):
+    return 1 if p < 0.5 else 2 if p < 0.75 else 4 if p < 0.9 else 8
+
+
+def build_phase(ctx):
+    """Pulses since the build began, at the ladder's rate: continuous across its steps, so nothing jumps."""
+    t, n = ctx.get("build_t", 0.0), max(1.0, ctx.get("build_len", 16.0) - 1)
+    ph, prev = 0.0, 0.0
+    for edge, rate in ((0.5, 1), (0.75, 2), (0.9, 4), (99.0, 8)):
+        ph += rate * max(0.0, min(t, edge * n) - prev)
+        prev = edge * n
+        if t <= prev:
+            break
+    return ph
+
+
+def build_field(ctx, u, x):
+    """(hue, saturation, value) of the build at stage place u and height x, for every style but rise."""
+    style, p, hue = ctx.get("build_style"), ctx["progress"], ctx["hue"]
+    u, x = np.asarray(u, np.float32), np.asarray(x, np.float32)
+    ph = build_phase(ctx)
+    f = ph % 1.0
+    if style == "sweep":                                   # across in 2 pulses, back in 2
+        c = 1 - abs(2 * ((ph / 4) % 1.0) - 1)
+        band = np.exp(-np.abs(u - c) * (5 + 6 * p))
+        h = hue + 0.12 * (c - 0.5) + 0 * x
+        sat = 1 - 0.8 * p * band
+        v = 0.04 + 0.1 * p + band * (0.45 + 0.55 * p) * (0.6 + 0.4 * x)
+    elif style == "converge":                              # the outside in, each pulse
+        d = np.abs(u - 0.5) * 2
+        front = 1 - f * 1.15
+        ring = np.exp(-np.abs(d - front) * 7)
+        together = math.exp(-f * 6) * min(1.0, max(0.0, (p - 0.7) * 3.5))
+        h = pal(ctx, int(ph)) + 0.06 * x + 0 * u
+        sat = 1 - 0.75 * p * np.maximum(ring, together)
+        v = 0.05 + 0.08 * p + np.maximum(ring * (0.45 + 0.55 * p), together) * (0.7 + 0.3 * x)
+    elif style == "swell":                                 # a breath every 2 pulses
+        b = 0.5 - 0.5 * math.cos(math.pi * ph)
+        h = layer(ctx, u, x) + 0.35 * p * p
+        sat = 1 - 0.6 * p * p + 0 * u
+        v = (0.05 + (0.15 + 0.85 * p) * b ** 1.5) * (0.65 + 0.35 * x) + 0 * u
+        if (ctx.get("beats_to_drop") or 99) <= 5:             # the last bar: white flicker on the 8ths
+            on = ((ctx["beat"] * 2) % 1.0) < 0.5
+            sat, v = sat * 0.2, v * 0 + (0.9 if on else 0.08)
+    else:                                                  # stutter: left and right trade hits
+        spb = max(2, build_rate(p))
+        k = int(math.floor(ctx["beat"] * spb))
+        mid = np.abs(u - 0.5) < 0.1
+        on = mid | ((u < 0.5) == (k % 2 == 0))
+        h = pal(ctx, k // 2) + 0.05 * x + 0 * u
+        sat = 1 - 0.7 * p + 0 * u
+        v = np.where(on, (0.35 + 0.65 * p) * (0.75 + 0.25 * x), 0.03)
+    return np.broadcast_arrays(np.asarray(h, np.float32), np.asarray(sat, np.float32), np.asarray(v, np.float32))
 
 
 # ---------------------------------------------------------------- leg pyramids
@@ -591,6 +663,8 @@ def pyramid(ctx, n, role, state):
         out = pyramid_wave(ctx, n, role, order, x)
         if s == "DROP":
             laser = 1.0 if pyramid_laser(ctx) else 0.0
+    elif s in ("BUILD", "HOLD") and ctx.get("build_style", "rise") != "rise":
+        out = hsv(*build_field(ctx, place(role), x)) + 0 * order[..., None]
     elif s in ("BUILD", "HOLD"):
         # The spiral fill: the legs light from the feet in a spiral round the outside, reaching
         # the apex as the build ends; a white head leads it, and the lit part flickers faster near the end.
@@ -875,6 +949,10 @@ def par(ctx, role, state):
         v = (0.10 + 0.25 * en + 0.2 * sp) * (0.45 + 0.55 * half)
         colour(hue + 0.5 * mixc, 0.55 + 0.4 * sp, v)
         out["uv"] = 0.4 + 0.3 * half
+    elif s in ("BUILD", "HOLD") and ctx.get("build_style", "rise") != "rise":
+        h, sa, v = (float(a) for a in build_field(ctx, place(role), 0.5))
+        colour(h, sa, v)
+        out["w"] = (1 - sa) * v                       # whiter as it desaturates
     elif s in ("BUILD", "HOLD"):
         p = ctx["progress"]
         rate = 1 if p < 0.5 else 2 if p < 0.75 else 4 if p < 0.9 else 8
