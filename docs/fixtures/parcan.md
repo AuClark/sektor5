@@ -39,6 +39,7 @@ The uDMX now plugs into the CM4 (`sektor5`) and the par can is a fixture in the 
 Battery-powered wireless DMX uplight (black box, "WIRELESS DMX CODE" button, IR receiver, colour LCD, buttons MENU / UP / DOWN / ENTER).
 Main menu: Dmx512, Shows, Sound, Color, Set, Help.
 Current setting: **Dmx512 mode, address A001, 10CH mode.** Wired DMX works; wireless DMX isn't tested yet.
+If the display shows anything other than `A001` (e.g. `AC:02`, one of its own colour programs; static colour 2 is solid blue), it's out of DMX mode and ignores the show: Menu → Dmx512 → A001 → Enter. The show side can't tell (DMX is one-way), so check the display first when the par can doesn't react.
 
 ## uDMX protocol (what works)
 - Control transfer, bmRequestType 0x40 (vendor, device, host-to-device)
