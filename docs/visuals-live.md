@@ -153,7 +153,7 @@ presets in turn.
 - **Shuffle** turns it on and off (**S**). The thin bar under it fills up to the next change, and
   the text says how many bars are left.
 - **every 1 · 2 · 4 · 8 · 16 · 32 bars** is how often.
-- **New track** (on by default) mixes to a new sketch from the theme on the first 1 after a new track comes in, i.e. when the lights move to the new deck or the live deck plays a different track. It works with Shuffle on or off, and restarts Shuffle's count. Not on a pause and resume of the same track.
+- **New track** (on by default) mixes to a new sketch from the theme on the next 1 when a new track comes in: as the DJ starts mixing it in (the other deck has played a different track for 8 bars; with no DJ Link mixer the decks can't say whose fader is up), or, if that wasn't seen, when the lights move to it or the live deck plays a different track. Once per track. It works with Shuffle on or off, and restarts Shuffle's count. Not on a pause and resume of the same track.
 - **Skip** (**N**) goes to the next one on the next 1, and works with Shuffle off too: "something
   else from this theme, in time".
 - **The theme tabs** are what it draws from. Pick **All** for everything.

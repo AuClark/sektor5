@@ -38,6 +38,7 @@ with a sketch in sketches/presets/NAME/ (in git); one saved on the brain with th
 
     python3 visuals.py [port]
 """
+import collections
 import gzip
 import hashlib
 import json
@@ -577,6 +578,11 @@ shuf_next = None        # the bar (on the downbeat grid) the next change lands o
 shuf_bar = None         # the bar it is now, as far as Shuffle last looked
 shuf_skip = False
 shuf_title = None       # the live deck's track, as Shuffle last saw it
+shuf_done = collections.deque(maxlen=4)   # tracks that have had their new look (mixing in, then going live)
+# A mix starting. With no DJ Link mixer the decks can't say whose fader is up, so the other deck
+# playing a different track for this many bars counts as the DJ bringing it in.
+MIX_IN_BARS = 8
+mix_in = None           # the title of a track being mixed in, from deck_watch()
 shuf_bags = {}          # what is left to play before anything repeats, per theme and per sketch
 
 
@@ -776,6 +782,32 @@ def shuffle_pick():
     return name, shuffle_preset(name, out_presets)
 
 
+def deck_watch():
+    """Spot a mix starting (see MIX_IN_BARS) from deckdash's decks, for Shuffle's new-track change."""
+    global mix_in
+    seen = {}                                          # player -> (title, when it started playing it)
+    while True:
+        time.sleep(0.5)
+        try:
+            with urllib.request.urlopen(f"{DECKDASH}/api/state", timeout=2) as r:
+                players = json.loads(r.read()).get("players", [])
+        except (OSError, ValueError):
+            continue
+        live, now, found = live_player(), time.time(), None
+        for p in players:
+            n, s, title = p.get("number"), p.get("status") or {}, (p.get("track") or {}).get("title")
+            if not s.get("playing") or not title:
+                seen.pop(n, None)
+                continue
+            if seen.get(n, (None,))[0] != title:
+                seen[n] = (title, now)
+            bpm = max(60.0, float(s.get("effectiveBpm") or 120))
+            if live and n != live and now - seen[n][1] >= MIX_IN_BARS * 4 * 60 / bpm:
+                found = title
+        with lock:
+            mix_in = found
+
+
 def shuffle_loop():
     """Watch the bar count and change the look on the downbeat. Skip lands on the next 1, and
     works with Shuffle off too: it is "something else from this theme, in time"."""
@@ -794,11 +826,19 @@ def shuffle_loop():
                 skip_at, shuf_skip, changed = bar + 1, False, True
             # A new track has come in: a new look on its next 1. Not on a pause and resume of the same
             # track, nor for whatever is already playing when the service starts.
+            # A track being mixed in gets it when the mix starts, not again when the lights move to it.
             title = live_title()
+            if mix_in and mix_in != title and mix_in not in shuf_done:
+                shuf_done.append(mix_in)
+                if shuffle["track"]:
+                    log(f"shuffle: mixing in {mix_in!r}: a new look on the next 1")
+                    skip_at, changed = bar + 1, True
             if title and title != shuf_title:
-                if shuf_title is not None and shuffle["track"]:
+                if shuf_title is not None and shuffle["track"] and title not in shuf_done:
                     log(f"shuffle: new track {title!r}: a new look on the next 1")
                     skip_at, changed = bar + 1, True
+                if title not in shuf_done:
+                    shuf_done.append(title)
                 shuf_title = title
             if shuffle["queue"] and not shuffle["on"] and skip_at is None:
                 skip_at, changed = bar + 1, True               # with Shuffle off, next up plays on the 1
@@ -1144,6 +1184,7 @@ if __name__ == "__main__":
         pass
     threading.Thread(target=state_pump, daemon=True).start()
     threading.Thread(target=shuffle_loop, daemon=True).start()
+    threading.Thread(target=deck_watch, daemon=True).start()
     threading.Thread(target=watch_active, daemon=True).start()
     trackwave.Follower(DECKDASH, STATE, live_player, set_wave).start()
     log(f"visuals up on :{PORT} (sketch {sketch['name']}; {len(names)} available)")
