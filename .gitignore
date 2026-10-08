@@ -13,3 +13,6 @@ brain/showbrain/s5auth.js
 brain/projector/web/s5auth.js
 brain/visuals/web/s5auth.js
 fixtures/holofan/capture/*.bin
+# deckdash's jars (fetch_libs.sh) and a local build (brain/sim/run_rig.sh)
+brain/deckdash/lib/
+brain/deckdash/classes/
