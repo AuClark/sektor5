@@ -43,8 +43,7 @@ public class Sim {
     /** For /api/system and /api/sim. */
     static String json() {
         boolean dj = org.deepsymmetry.beatlink.VirtualCdj.getInstance().isRunning();
-        int devices = org.deepsymmetry.beatlink.DeviceFinder.getInstance().isRunning()
-                ? org.deepsymmetry.beatlink.DeviceFinder.getInstance().getCurrentDevices().size() : 0;
+        int devices = realDecks();
         return new DeckDash.Json().obj().bool("on", on()).bool("available", available()).num("bpm", bpm)
                 .num("since", on() ? startedAt : 0).bool("djlink", dj).num("decks", devices)
                 .num("uptime_s", (System.currentTimeMillis() - DeckDash.started) / 1000).end().toString();
@@ -66,8 +65,33 @@ public class Sim {
         DeckDash.send(ex, 200, "application/json", json().getBytes(StandardCharsets.UTF_8));
     }
 
+    /** Real Pro DJ Link gear on the network (players, mixers). */
+    static int realDecks() {
+        org.deepsymmetry.beatlink.DeviceFinder f = org.deepsymmetry.beatlink.DeviceFinder.getInstance();
+        return f.isRunning() ? f.getCurrentDevices().size() : 0;
+    }
+
+    // Never simulate over real decks: when any turn up, the simulation switches itself off.
+    static {
+        Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(2000);
+                    if (on() && realDecks() > 0) {
+                        DeckDash.log("real decks connected: simulation off");
+                        stop();
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }, "sim-guard");
+        t.setDaemon(true);
+        t.start();
+    }
+
     static synchronized String start() {
         if (on()) return null;
+        if (realDecks() > 0) return "real decks are connected: the show is on them";
         if (!available()) return "the simulator isn't installed (brain/deploy.sh deckdash copies it)";
         SystemInfo.exec(10, "sudo", "-n", "systemctl", "stop", "mixer");
         try {

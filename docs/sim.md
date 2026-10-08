@@ -50,6 +50,7 @@ The brain can run the same synthetic rig, so a Pi on the bench (or at home, with
 - **When no decks are found**, every page shows a **NO DECKS** pill at the top right, next to the lock. Tap it for **Start simulation** (needs admin, the PIN) or **Not now**.
 - **While it runs**, an amber **SIM** pill replaces the page's LIVE pill (it's the simulator, not the decks). Tap it for sound, volume and **Back to real decks**. Everything else is real: showbrain, the lights, projection, visuals, the Stage view, the admin PIN and the System view.
 - **Nothing sticks:** stopping it, restarting deckdash or rebooting goes back to the real decks.
+- **Never over real decks:** with any deck (or DJ Link mixer) on the network, deckdash refuses to start the simulation, and the **LIVE** pill no longer offers it. If one turns up while it runs, the simulation switches itself off within about 2 s.
 - API: `GET /api/sim`, `POST /api/sim {"on": true|false, "bpm": 126}` (admin). Also in `/api/system` as `sim`.
 
 How it works: deckdash ([`Sim.java`](../brain/deckdash/Sim.java)) runs `fakerig.py` (copied to `~/sim/` by `brain/deploy.sh deckdash`) on port 8079, passes the deck data API through to it (`/api/state`, `/api/events`, timelines, waveforms, library, `/api/deck`, `/api/tempo`), and stops sending its own deck feed to showbrain while fakerig sends the synthetic one. The mixer service is paused meanwhile, because with no DJM it would keep telling showbrain the mixer is unplugged. Its log is `/tmp/fakerig.log`.
