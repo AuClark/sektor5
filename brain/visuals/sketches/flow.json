@@ -13,7 +13,7 @@
       {"id": "trail",   "label": "Trail length",          "min": 0.01, "max": 0.5,  "step": 0.005, "default": 0.2},
       {"id": "width",   "label": "Line width (px)",       "min": 0.5,  "max": 8,    "step": 0.1,   "default": 2},
       {"id": "vary",    "label": "Width and alpha vary",  "min": 0,    "max": 1,    "step": 0.01,  "default": 0.7},
-      {"id": "steps",   "label": "Quality (trace steps)", "min": 8,    "max": 32,   "step": 1,     "default": 28}
+      {"id": "steps",   "label": "Trail reach (trace steps)", "min": 4,    "max": 16,   "step": 1,     "default": 12, "kind": "quality"}
     ]},
     {"name": "Beat", "params": [
       {"id": "punch",   "label": "Beat punch",            "min": 0,    "max": 1,    "step": 0.01,  "default": 0.3},
