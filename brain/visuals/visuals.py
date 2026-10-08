@@ -223,6 +223,51 @@ def select(name):
     (STATE / "active").write_text(name)
 
 
+def sketch_mtime(name):
+    """When the sketch's files last changed (its .glsl and .json), or 0 if they're gone."""
+    try:
+        return max((SKETCHES / f"{name}.glsl").stat().st_mtime, (SKETCHES / f"{name}.json").stat().st_mtime)
+    except OSError:
+        return 0.0
+
+
+def watch_active():
+    """Reload the active sketch when its files change on disk, keeping its values and automation (new
+    settings take their defaults), and tell every page. Before this, an edited sketch stayed as it was
+    loaded until it was picked again, which looked like the edit hadn't worked."""
+    seen = None
+    while True:
+        time.sleep(1.5)
+        try:
+            with lock:
+                if not sketch:
+                    continue
+                name, mt = sketch["name"], sketch_mtime(sketch["name"])
+                if seen is None or seen[0] != name:
+                    seen = (name, mt)
+                    continue
+                if mt <= seen[1]:
+                    continue
+                seen = (name, mt)
+                load_new(name)
+                sk, snap, asnap, frz = sketch, dict(values), {k: dict(v) for k, v in auto.items()}, auto_freeze
+            log(f"sketch {name} changed on disk: reloaded")
+            broadcast({"t": "sketch", "sketch": sk})
+            broadcast({"t": "params", "params": snap})
+            broadcast(auto_msg(asnap, frz))
+        except Exception as e:                      # a half-written file: try again next time round
+            log(f"watch: {e}")
+
+
+def load_new(name):
+    """Swap in a fresh copy of the active sketch from disk. Caller holds the lock."""
+    global sketch, values, auto
+    sk = load_sketch(name)
+    sketch = sk
+    values = clamp_values(sk, values, defaults(sk))
+    auto = clamp_auto(sk, auto, auto_defaults(sk))
+
+
 def load_preset(name):
     """Load preset NAME onto the active sketch. Caller holds the lock. False if there is no such preset."""
     global values, auto, text, current_preset
@@ -1078,6 +1123,7 @@ if __name__ == "__main__":
         pass
     threading.Thread(target=state_pump, daemon=True).start()
     threading.Thread(target=shuffle_loop, daemon=True).start()
+    threading.Thread(target=watch_active, daemon=True).start()
     trackwave.Follower(DECKDASH, STATE, live_player, set_wave).start()
     log(f"visuals up on :{PORT} (sketch {sketch['name']}; {len(names)} available)")
     ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()

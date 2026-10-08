@@ -288,6 +288,7 @@ can read them immediately.
 - The beat clock runs smoothly at the track's tempo and eases towards the show engine's reported position (at most 10% faster or slower), so network jitter on the ~20 updates a second doesn't show as stutter. It only jumps on a seek or track change.
 - Shaders get `u_px` (one output pixel in surface units), so lines never go thinner than a pixel and don't shimmer as they move.
 - Live values and presets are kept on the brain in `~/visuals/state/`, not in git.
+- **Editing a sketch while it's playing:** the service watches the active sketch's `.glsl` and `.json` and reloads them when they change (within about 2 s), keeping the values and automation (a new setting takes its default), and every page and projector picks it up. Before, an edited sketch stayed as it was loaded until it was picked again.
 
 ## Speed
 
