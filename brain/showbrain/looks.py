@@ -521,6 +521,60 @@ def _pyr_mode(ctx, options):
     return options[seed % len(options)]
 
 
+PYR_LEFT = np.array([1, 0, 0, 1], np.float32)[:, None]   # the legs on the pyramid's left, seen from the front: FL, BL
+ACROSS = (0, 1, 2, 3, 3, 2, 1, 0)                        # "across": L's left, L's right, R's left, R's right, and back
+
+
+def pyr_blast_mask(mode, role, order, beat):
+    """(4 x 1): which legs fire on this beat. "blast": one leg a beat round the pyramid; "sides": its
+    left pair, then its right pair (the right pyramid mirrored, so outer sides, then inner); "across":
+    a side at a time across both pyramids and back, two bars a sweep. With the legs mirrored or in
+    diagonal pairs it can't pick legs: the whole pyramid (across: on its own beats)."""
+    b = int(math.floor(beat)) - 1                           # 0 on the downbeat (beats count from 1)
+    right = role.get("side", -1) > 0
+    if mode == "across":
+        slot = (2 if right else 0) + (1 - PYR_LEFT)          # this pyramid's left legs, right legs
+        on = slot == ACROSS[b % 8]
+        if role.get("mirrored") or role.get("diagonals"):
+            on = np.full((4, 1), (ACROSS[b % 8] >= 2) == right)
+        return on.astype(np.float32)
+    if role.get("mirrored") or role.get("diagonals"):
+        return np.ones((4, 1), np.float32)
+    if mode == "sides":
+        outer = (1 - PYR_LEFT) if right else PYR_LEFT        # its outer pair first, then the inner
+        return outer if b % 2 == 0 else 1 - outer
+    return (order == b % 4).astype(np.float32)               # blast
+
+
+def pyr_blast(ctx, role, order, x, frac, beat, mode, groove=False, base=None):
+    """The beat-blast looks (see pyr_blast_mask). In a drop the firing legs hit full and white-hot,
+    then fall back to the drop colour; in a groove they flash the show's colours over a dim base."""
+    mask = pyr_blast_mask(mode, role, order, beat)[..., None]   # (4, 1, 1)
+    kick = math.exp(-5 * frac)
+    white = np.ones(3, np.float32)
+    if groove:
+        lit = hsv(layer(ctx, place(role), x, shift=1.0 + 0.25 * (int(math.floor(beat)) % 4)), 1.0, (0.3 + 0.7 * kick) * (0.75 + 0.25 * x))
+        lit = lerp(lit, white[None, None, :], 0.35 * kick ** 2)
+        dim = (base if base is not None else hsv(layer(ctx, place(role), x), 1.0, 0.1)) * 0.35
+        return np.where(mask > 0, lit + 0 * dim, dim)
+    hue = pal(ctx, int(math.floor(beat)))
+    lit = lerp(hsv(hue + 0.08 * x + 0 * order, 1.0, 0.35 + 0.65 * kick), white[None, None, :], 0.8 * kick ** 2)
+    dim = hsv(pal(ctx, order) + 0.1 * x, 1.0, 0.06)
+    return np.where(mask > 0, lit, dim)
+
+
+def pyr_drop_phases(ctx):
+    """The drop's middle two 4-bar phases, picked per drop (the same on both pyramids)."""
+    sd, b = ctx["since_drop"], ctx["beat"]
+    start = round(b - sd)
+    seed = str_hash(ctx.get("title")) + (ctx.get("live") or 0)
+    two = ("rockets", "blast", "sides", "across")
+    p2 = two[int(_jhash(start * 0.61 + seed % 991) * len(two)) % len(two)]
+    three = [m for m in ("bounce", "blast", "sides", "across") if m != p2]
+    p3 = three[int(_jhash(start * 0.29 + seed % 977 + 5.3) * len(three)) % len(three)]
+    return p2, p3
+
+
 @unyellow
 def pyramid(ctx, n, role, state):
     """(4n + 1, 3): the legs' LEDs, then the laser (1 = on)."""
@@ -559,7 +613,7 @@ def pyramid(ctx, n, role, state):
             front = 1 - sd
             out = np.where((x >= front)[..., None], white, hsv(hue, 1, 0.1)) + 0 * order[..., None]
         else:
-            out = pyramid_drop(ctx, order, x, frac, bwb, beat, kick if sd < 4 else hit(ctx, role), mir, st)
+            out = pyramid_drop(ctx, order, x, frac, bwb, beat, kick if sd < 4 else hit(ctx, role), mir, st, role)
         # The laser comes on with the drop: held for the first bar, then a new rhythm each phrase.
         laser = 1.0 if pyramid_laser(ctx) else 0.0
     elif s == "BREAKDOWN":
@@ -581,7 +635,10 @@ def pyramid(ctx, n, role, state):
         # bars, an orbiting comet (one leg a beat, round the pyramid) or a spiral chase (a bar a lap).
         k = min(1.0, hit(ctx, role) * drive(ctx))
         base = hsv(layer(ctx, place(role), x, shift=0.2 * order), 1.0, (0.2 + 0.8 * k + 0.2 * hat(frac)) * (1 - 0.4 * x))
-        if _pyr_mode(ctx, ("orbit", "spiral")) == "orbit":
+        gmode = _pyr_mode(ctx, ("orbit", "spiral", "blast", "sides", "across"))
+        if gmode in ("blast", "sides", "across"):
+            tail = None
+        elif gmode == "orbit":
             headx = frac * 1.15
             tail = np.clip(1 - (headx - x) * 5, 0, 1) * (x <= headx) * (True if mir else (order == (bwb - 1) % st))   # mirrored: up every leg each beat
         else:
@@ -589,7 +646,10 @@ def pyramid(ctx, n, role, state):
             headp = ((bwb - 1) + frac) / 4
             d = headp - sp
             tail = np.where((d >= 0) & (d < 0.12), np.exp(-d * 30), 0.0)
-        out = lerp(base, hsv(layer(ctx, place(role), x, shift=1.5), 0.35, 1.0), tail * 0.9)
+        if tail is None:
+            out = pyr_blast(ctx, role, order, x, frac, beat, gmode, groove=True, base=base)
+        else:
+            out = lerp(base, hsv(layer(ctx, place(role), x, shift=1.5), 0.35, 1.0), tail * 0.9)
         if s == "GROOVE":
             out = pyramid_after(ctx, order, x, frac, beat, kick, mir, st, out)
     legs =np.broadcast_to(np.asarray(out, np.float32), (4, n, 3)).reshape(4 * n, 3)   # a look can be one leg tall
@@ -646,14 +706,20 @@ def pyramid_laser(ctx):
     return f(b * 2) < 0.5
 
 
-def pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st):
+def pyramid_drop(ctx, order, x, frac, bwb, beat, kick, mir, st, role=None):
     """After the burst, four 4-bar phases: slam (a ring falls from the apex every beat over
-    alternating colours), rockets (white heads shoot from the feet to the apex, round the legs
-    unless they're mirrored), bounce (the legs fill to the kick like a level meter, the colour
-    flipping every bar, a white cap on top) and peak (a 16th-note strobe, then white fills from
-    the feet over the last two beats)."""
+    alternating colours), then two picked per drop (pyr_drop_phases): rockets (white heads shoot
+    from the feet to the apex, round the legs unless they're mirrored), bounce (the legs fill to the
+    kick like a level meter, the colour flipping every bar, a white cap on top) or a beat blast
+    (blast, sides, across: pyr_blast), and last peak (a 16th-note strobe, then white fills from the
+    feet over the last two beats)."""
     sd, hue = ctx["since_drop"], ctx["hue"]
     white = np.ones(3, np.float32)
+    if 16 <= sd < 48:
+        mode = pyr_drop_phases(ctx)[0 if sd < 32 else 1]
+        if mode in ("blast", "sides", "across"):
+            return pyr_blast(ctx, role or {}, order, x, frac, beat, mode)
+        # else rockets (only ever picked for 16-32) or bounce (only 32-48): the phases below
     if sd < 16:                                            # slam
         base = hsv(pal(ctx, order + int(sd // 4)) + 0 * x, 1.0, 0.5 + 0.5 * kick)
         ring = np.clip(1 - np.abs((1 - x) - frac) * 7, 0, 1)

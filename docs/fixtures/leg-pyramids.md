@@ -116,15 +116,17 @@ Showbrain's looks (`looks.pyramid` in [`looks.py`](../../brain/showbrain/looks.p
 
 | Section | Legs | Laser |
 |---|---|---|
-| Groove | The feet pulse with the kick in the show colour, plus (changing with the track and every 16 bars) an **orbit**: a white comet up one leg per beat, round the pyramid, or a **spiral chase**: a comet climbing the spiral once a bar | off |
+| Groove | The feet pulse with the kick in the show colour, plus (changing with the track and every 16 bars) an **orbit**: a white comet up one leg per beat, round the pyramid, or a **spiral chase**: a comet climbing the spiral once a bar, or (softer, in colour) one of the beat blasts below | off |
 | Build / hold | **The spiral fill**: the legs light from the feet in a spiral round the outside (six turns, a leg at a time), reaching the apex as the build ends, led by a white head; the lit part flickers faster (on the beat, 8ths, 16ths, 32nds) as the drop nears. A hold freezes it | off |
 | Predrop | Dark, except the tips of the legs | off |
 | Drop | On the downbeat a white burst runs from the apex down all four legs, then full colour (alternate legs in the complementary colour) pulsing with the kick, with a white ring falling from the apex each beat; after 4 bars a white highlight also turns round the legs, a leg a beat | **comes on with the drop**: held for the first bar, then on the kick to bar 8, then on the one |
+| Drop, bars 5–12 | Two of these, picked per drop (the same on both pyramids): **rockets** (white heads up the legs), **bounce** (the legs fill to the kick like a level meter), or a beat blast: **blast** (one leg a beat goes white-hot, round the pyramid: FL, FR, BR, BL; the right pyramid the other way), **sides** (the left pair, then the right pair; mirrored, so both outer sides, then both inner), **across** (a side at a time across both pyramids: left's left, left's right, right's left, right's right, then back) | as above |
 | Breakdown, intro, outro | Slow breathing in a soft complementary colour, brighter towards the top | off |
 | Strobe, blinder, blackout | follow the rest of the rig | off in a blackout |
 
 Other ideas for later:
-- Pass a comet from one pyramid to the other across the stage (left pyramid's legs, then the tubes, then the right's).
+- Pass a comet from one pyramid to the other across the stage (left pyramid's legs, then the tubes, then the right's). (*Across* does this with whole sides.)
+- The Stage view's own sketch (nothing playing / View → Section) doesn't draw blast, sides or across yet; live it shows them.
 - The legs as a VU meter: the level of each deck's channel from the mixer, on its own pyramid.
 - With the cover on, fills read as the whole pyramid glowing; without it, the edges draw a wireframe in the air. Looks may want to know which.
 
