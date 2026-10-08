@@ -1,1 +1,14 @@
-{"thick": 2, "shift": 0.3}
+{
+ "thick": 2.4,
+ "speed": 0.14,
+ "size": 1.8,
+ "small": 0,
+ "warp": 0.8,
+ "spec": 0.6,
+ "punch": 0.3,
+ "swell": 0.2,
+ "shift": 0.3,
+ "follow": 0,
+ "bright": 1.0,
+ "octaves": 3
+}

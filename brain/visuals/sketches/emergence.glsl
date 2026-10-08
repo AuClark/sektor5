@@ -5,7 +5,8 @@
 // maze slithers and rewires. Coloured zones, ragged rim and a hole, beat-locked.
 // Params are p_* uniforms; ranges and defaults are in emergence.json.
 uniform float p_waves, p_scale, p_thick, p_flow, p_turn, p_spin, p_beat,
-              p_size, p_hole, p_ragged, p_grow, p_mix, p_blobs, p_hue, p_sat, p_follow;
+              p_size, p_hole, p_ragged, p_grow, p_mix, p_blobs, p_hue, p_sat, p_follow, p_fill,
+              p_trip, p_twirl, p_kal, p_pulse;
 
 #define TAU 6.2831853
 #define PI 3.1415927
@@ -23,9 +24,19 @@ vec3 content(vec2 uv) {
   vec2 p = (uv - 0.5) * vec2(u_aspect, 1.0);
   float sa = t * p_spin * TAU / 64.0;
   p = mat2(cos(sa), -sin(sa), sin(sa), cos(sa)) * p;
+  // Trip: a slow vortex in the middle, turning one way and back over 8 bars; and a kaleidoscope that
+  // folds the maze into mirrored wedges (a mandala). Both keep the middle filled.
+  float r0 = length(p);
+  float tw = p_twirl * 0.9 * sin(u_beat * PI / 16.0) * exp(-r0 * 2.0);
+  p = mat2(cos(tw), -sin(tw), sin(tw), cos(tw)) * p;
+  if (p_kal > 2.5) {
+    float n = floor(p_kal + 0.5), sec = TAU / n, a = mod(atan(p.y, p.x + 1e-5), sec);
+    a = min(a, sec - a);
+    p = vec2(cos(a), sin(a)) * r0;
+  }
 
   // Labyrinth: f = sum of cosines, g = its gradient (for a pixel-exact edge).
-  float kk = TAU * p_scale;
+  float kk = TAU * p_scale * (1.0 + 0.05 * p_pulse * kick());          // the maze breathes in on the kick
   float f = 0.0;
   vec2 g = vec2(0.0);
   for (int i = 0; i < 16; i++) {
@@ -56,16 +67,25 @@ vec3 content(vec2 uv) {
   float r = length(p);
   float rr = r + p_ragged * ((vnoise(p * 4.0 + 3.0) - 0.5) * 0.16 + (vnoise(p * 15.0) - 0.5) * 0.035);
   float R = p_size * (1.0 + p_grow * (u_sp - 0.5)) * (1.0 + 0.04 * k);
+  // Fill the screen: the rim goes out past the surface's corners (whatever its shape), so the maze
+  // covers it all and the zones become rings across the whole picture.
+  if (p_fill > 0.5) R = 0.5 * sqrt(u_aspect * u_aspect + 1.0) * (1.06 + 0.04 * k) + 0.12 * p_ragged;
+  float hole = p_fill > 0.5 ? 0.0 : p_hole;                         // filling the screen: no hole in the middle either
   float inside = smoothstep(-u_px, u_px, R - rr);
-  if (p_hole > 0.0) inside *= smoothstep(-u_px, u_px, rr - p_hole);
+  if (hole > 0.0) inside *= smoothstep(-u_px, u_px, rr - hole);
 
   // Zones: inner blue, a mixed band of pink / green / pale blue, outer teal.
-  float z = (rr - p_hole) / max(R - p_hole, 1e-3) + (vnoise(p * 6.0 + 40.0) - 0.5) * p_mix;
+  float z = (rr - hole) / max(R - hole, 1e-3) + (vnoise(p * 6.0 + 40.0) - 0.5) * p_mix;
   float pick = vnoise(mat2(0.6, 0.8, -0.8, 0.6) * p * 11.0 + 80.0);
   vec3 hs = z < 0.45 ? vec3(0.56, 0.62, 0.80)
           : z < 0.72 ? (pick < 0.4 ? vec3(0.92, 0.72, 0.86) : pick < 0.62 ? vec3(0.30, 0.58, 0.45) : vec3(0.60, 0.22, 0.88))
           :            vec3(0.48, 0.62, 0.84);
   float hue0 = p_hue + (p_follow > 0.5 ? u_hue - 0.56 : 0.0);
   vec3 col = hsv(hs.x + hue0, hs.y * p_sat, hs.z * (blob > 0.5 ? 1.08 : 1.0));
-  return col * worm * inside * (0.88 + 0.12 * k);
+  // Trip: rings of rainbow flowing out from the middle through the worms (an eighth of the wheel a beat,
+  // a little more on the kick), and a deep glow of the opposite colour in the gaps instead of black.
+  float rh = rr * 1.4 - u_beat * 0.125 - 0.05 * kick() + (blob > 0.5 ? 0.33 : 0.0) + hue0;
+  col = mix(col, hsv(rh, 0.75 * p_sat, 0.95), 0.85 * p_trip);
+  vec3 gap = hsv(rh + 0.5, 0.8, 0.16) * p_trip;
+  return mix(gap, col * (0.88 + 0.12 * k), worm) * inside;
 }

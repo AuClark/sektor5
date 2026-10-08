@@ -133,5 +133,6 @@ vec3 content(vec2 uv0) {
   float vig = 1.0 - smoothstep(0.4, 1.3, length(uv));
   col *= mix(1.0, 0.6 + 0.4 * vig, p_vignette);
   col = pow(max(col, vec3(0.0)), vec3(0.93, 0.97, 1.04));
-  return clamp(col * p_bright, 0.0, 1.0);
+  // A soft lift for the projector, which crushes dark mids: darks and mids up about 2x, highlights eased, black stays black.
+  return clamp((1.0 - exp(-col * p_bright * 2.6)) / (1.0 - exp(-2.6)), 0.0, 1.0);
 }

@@ -16,9 +16,16 @@
     ]},
     {"name": "Organism", "params": [
       {"id": "size",   "label": "Size",                 "min": 0.1,  "max": 1.2,  "step": 0.01,  "default": 0.46},
+      {"id": "fill", "label": "Fill the screen, no hole (0 = an organism with a rim and its hole)", "min": 0, "max": 1, "step": 1, "default": 1, "kind": "fixed"},
       {"id": "hole",   "label": "Hole",                 "min": 0,    "max": 0.4,  "step": 0.005, "default": 0.08},
       {"id": "ragged", "label": "Ragged edge",          "min": 0,    "max": 1,    "step": 0.01,  "default": 0.6},
       {"id": "grow",   "label": "Grow through section", "min": 0,    "max": 1,    "step": 0.01,  "default": 0.3}
+    ]},
+    {"name": "Trip", "params": [
+      {"id": "trip",   "label": "Rainbow flowing out",   "min": 0,    "max": 1,    "step": 0.01,  "default": 0.6},
+      {"id": "twirl",  "label": "Vortex in the middle",  "min": 0,    "max": 2,    "step": 0.01,  "default": 0.8},
+      {"id": "kal",    "label": "Kaleidoscope wedges (0 off)", "min": 0, "max": 12, "step": 1, "default": 0, "kind": "fixed"},
+      {"id": "pulse",  "label": "Breathes on the kick",  "min": 0,    "max": 1,    "step": 0.01,  "default": 0.5}
     ]},
     {"name": "Colour", "params": [
       {"id": "mix",    "label": "Zone mixing",          "min": 0,    "max": 1,    "step": 0.01,  "default": 0.35},

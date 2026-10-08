@@ -78,14 +78,33 @@ float radiusAt(float s) {
 // Nearest point on a dragon's body: (distance, s, v across -1..1 with + on the finned
 // outer side, depth).
 vec4 bodyQ(vec2 p, float side) {
+  // The points along the body are the same for every pixel, so they're stepped along, not worked out
+  // afresh: each of orbitPt's angles moves by a fixed amount from one point to the next, so the next
+  // point is the last one turned by that much (complex multiplication), no sin or cos per segment.
+  // Same curve as bp(); the kiss pose is only mixed in while there is a kiss.
+  float ds = 1.0 / float(NSEG);
+  float a0 = g_t + (side > 0.0 ? PI : 0.0);
+  vec2 ea = vec2(cos(a0), sin(a0)), da = vec2(cos(g_len * ds), -sin(g_len * ds));                  // the angle a
+  vec2 e2 = vec2(cos(2.0 * a0 + side * 1.3), sin(2.0 * a0 + side * 1.3)), d2 = vec2(da.x * da.x - da.y * da.y, 2.0 * da.x * da.y);   // 2a
+  vec2 ew = vec2(cos(-u_beat * PI), sin(-u_beat * PI)), dw = vec2(cos(13.0 * ds), sin(13.0 * ds));  // the body's wave
+  bool kiss = g_kz > 0.0;
   vec3 a = bp(side, 0.0);
   vec4 res = vec4(1e5, 0.0, 0.0, 0.0);
   for (int i = 1; i <= NSEG; i++) {
-    vec3 b = bp(side, float(i) / float(NSEG));
+    ea = vec2(ea.x * da.x - ea.y * da.y, ea.x * da.y + ea.y * da.x);
+    e2 = vec2(e2.x * d2.x - e2.y * d2.y, e2.x * d2.y + e2.y * d2.x);
+    ew = vec2(ew.x * dw.x - ew.y * dw.y, ew.x * dw.y + ew.y * dw.x);
+    float si = float(i) * ds;
+    float rr = 1.0 + 0.14 * e2.y + g_amp * ew.y * smoothstep(0.0, 0.25, si);
+    vec3 b = vec3(ea.x * g_rx * rr, ea.y * g_ry * rr, ea.y);
+    if (kiss) {
+      float w = smoothstep(0.0, 1.0, clamp(g_kz * 1.7 - si * 0.7, 0.0, 1.0));
+      b = vec3(mix(b.xy, heartPt(side, si), w), b.z * (1.0 - w));
+    }
     vec2 pa = p - a.xy, ba = b.xy - a.xy;
     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
     vec2 c = pa - ba * h;
-    float s = (float(i) - 1.0 + h) / float(NSEG);
+    float s = (float(i) - 1.0 + h) * ds;
     float z = mix(a.z, b.z, h);
     float r = radiusAt(s) * (1.0 + 0.15 * z * -1.0);
     float d = length(c) - r;

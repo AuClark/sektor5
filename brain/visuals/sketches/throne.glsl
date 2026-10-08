@@ -5,7 +5,7 @@
 // a local named `dot` renamed (it hid the built-in), the spokes' dark-ray bug fixed, unused functions dropped, time in
 // beats, the centre and inner ring pulse on the kick instead of a clock, and a size
 // control so it fits any surface. Params are p_* uniforms; ranges and defaults are in throne.json.
-uniform float p_size, p_speed, p_rot, p_layers, p_spin, p_spiral, p_lace, p_punch, p_glow,
+uniform float p_fill, p_size, p_speed, p_rot, p_layers, p_spin, p_spiral, p_lace, p_punch, p_glow,
               p_tint, p_hue, p_sat, p_bright, p_follow;
 
 #define PI 3.14159265359
@@ -93,7 +93,9 @@ float fractalDetail(vec2 uv, float time) {
 
 vec3 content(vec2 uv0) {
   // The original's coordinates: centred, shorter side = 1, y up; Size scales the mandala.
-  vec2 uv = (uv0 - 0.5) * vec2(u_aspect, 1.0) / min(u_aspect, 1.0) / max(p_size, 0.05);
+  // Fill the screen: zoomed so the mandala's outer ring reaches the surface's corners (Size 1), whatever its shape.
+  float cover = p_fill > 0.5 ? 0.5 * sqrt(u_aspect * u_aspect + 1.0) / min(u_aspect, 1.0) / 0.48 : 1.0;
+  vec2 uv = (uv0 - 0.5) * vec2(u_aspect, 1.0) / min(u_aspect, 1.0) / max(p_size * cover, 0.05);
   uv.y = -uv.y;
   float t = u_beat * p_speed;
   float k = kick();
@@ -101,7 +103,8 @@ vec3 content(vec2 uv0) {
   float complexity = p_layers;
   float r = length(uv);
   float objectRadius = 0.48;
-  float objectFade = 1.0 - smoothstep(objectRadius * 0.7, objectRadius, r);
+  // Fill the screen: no fade at the mandala's edge, so its layers carry on out to the surface's edges.
+  float objectFade = p_fill > 0.5 ? 1.0 : 1.0 - smoothstep(objectRadius * 0.7, objectRadius, r);
   float glowk = p_glow * (1.0 + p_punch * k);
 
   vec3 col = vec3(0.0);
@@ -134,7 +137,7 @@ vec3 content(vec2 uv0) {
 
   col *= objectFade;
   col += warm(vec3(0.3, 0.2, 0.08)) * exp(-r * r * 6.0) * 0.06;
-  col = max(col * p_bright, vec3(0.0));
+  col = max(col * p_bright * 1.6, vec3(0.0));   // brighter than the original: the projector crushes its dim gold lines
   col = col / (1.0 + col * 0.4);
   col = pow(col, vec3(0.95, 0.98, 1.05));
   return clamp(col, 0.0, 1.0);

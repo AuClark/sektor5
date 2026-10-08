@@ -31,6 +31,7 @@ vec3 city(vec2 p, float sharp) {
     float dx = mod(p.x - lp.x + 0.5 * W, W) - 0.5 * W;
     float d = length(vec2(dx, p.y - lp.y));
     float edge = R * mix(0.9 * p_blur, 0.1, sharp);
+    if (d >= R + 0.25 * edge) continue;                  // outside this light: skip its colour (most pixels, most lights)
     float disk = 1.0 - smoothstep(R - edge, R + 0.25 * edge, d);
     float core = 1.0 - 0.5 * clamp(d / R, 0.0, 1.0);             // solid centre, not a ring
     float sel = hash(vec2(fi, 5.3)), hv = hash(vec2(fi, 6.1));
@@ -47,6 +48,7 @@ vec3 city(vec2 p, float sharp) {
     float dx = mod(p.x - lp.x + 0.5 * W, W) - 0.5 * W;
     float d = length(vec2(dx, p.y - lp.y));
     float R = 0.3 + 0.45 * hash(vec2(fi, 32.1));
+    if (d > 2.6 * R) continue;                            // its glow is under 1/1000 out here
     float sel = hash(vec2(fi, 33.7));
     float hue = sel > 0.45 ? 0.055 + 0.07 * hash(vec2(fi, 34.9)) : (sel > 0.2 ? 0.72 + 0.14 * hash(vec2(fi, 34.9)) : 0.86 + 0.08 * hash(vec2(fi, 34.9)));
     c += hsv(hue, 0.5, 0.28) * exp(-d * d / (R * R * 0.5)) * 0.35 * p_lights;
@@ -59,6 +61,7 @@ vec3 city(vec2 p, float sharp) {
     float dx = mod(p.x - lp.x + 0.5 * W, W) - 0.5 * W;
     float d = length(vec2(dx, p.y - lp.y));
     float R = 0.012 + 0.03 * hash(vec2(fi, 22.9));
+    if (d > 35.0 * R) continue;                           // past its halo (under 1/1000)
     float hue = hash(vec2(fi, 23.3)) > 0.25 ? 0.06 + 0.07 * hash(vec2(fi, 24.1)) : 0.53 + 0.08 * hash(vec2(fi, 24.1));
     float coreR = R * mix(2.2 * p_blur, 1.0, sharp);
     c += hsv(hue, 0.5, 1.0) * exp(-d * d / (coreR * coreR * 0.15)) * 0.8 * p_lights;
@@ -189,5 +192,6 @@ vec3 content(vec2 uv) {
 
   col = applyUmbrellaRibs(col, uv);
   col = hueShift(max(col, 0.0), p_hue + p_follow * u_hue);
-  return clamp(col * p_bright, 0.0, 1.0);
+  // A soft lift for the projector, which crushes dark mids: darks and mids up about 1.8x, highlights eased, black stays black.
+  return clamp((1.0 - exp(-col * p_bright * 2.2)) / (1.0 - exp(-2.2)), 0.0, 1.0);
 }

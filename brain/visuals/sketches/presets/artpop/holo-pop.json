@@ -1,1 +1,14 @@
-{"follow": 1, "punch": 1.2, "swell": 1.5, "speed": 0.5, "thick": 1.5, "bright": 1.1}
+{
+ "thick": 1.6,
+ "speed": 0.5,
+ "size": 0.9,
+ "small": 1,
+ "warp": 0.5,
+ "spec": 1.4,
+ "punch": 1.4,
+ "swell": 1.6,
+ "shift": 0.0,
+ "follow": 1,
+ "bright": 1.2,
+ "octaves": 2
+}

@@ -1186,7 +1186,9 @@ const TG = () => SEL ? mineS().find(x => x.id === SEL) || null : null;
 const own = () => { const t = TG(); return t && t.content === "gen" && t.sketch ? t : null; };
 const BUILT = { show: "Lights' colours", pulse: "Beat flash", tunnel: "Tunnel", bars: "Bars", title: "Track name", solid: "Solid colour", test: "Test grid" };
 const focusName = () => SK ? SK.title || SK.name : "Focus";
-const shows = x => x.content !== "gen" ? BUILT[x.content] || x.content : x.sketch ? titleOf(x.sketch) + (x.preset ? " · " + x.preset : "") : "Focus · " + focusName();
+const shows = x => x.content !== "gen" ? BUILT[x.content] || x.content
+  : x.sketch && ALL.length && !ALL.includes(x.sketch) ? `Focus (${x.sketch} was removed)`     // render.js shows Focus for a sketch that's gone
+  : x.sketch ? titleOf(x.sketch) + (x.preset ? " · " + x.preset : "") : "Focus · " + focusName();
 function useLayout(l) {
   R.layout = l && l.surfaces.some(x => projOf(x) === R.projectorId(PROJ)) ? l : FULLFRAME;
   if (R.layout !== FULLFRAME) R.layout.lead_ms = l.lead_ms ?? 60;

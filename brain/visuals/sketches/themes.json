@@ -2,18 +2,18 @@
   "_about": "Which theme each sketch belongs to, in the order the Visuals page shows them. Shuffle draws from one theme (or all of them). A sketch listed here that doesn't exist is skipped; a sketch that isn't listed shows under Other.",
   "themes": [
     {"id": "sacred",  "name": "Sacred",  "blurb": "Gold, geometry and temples",
-     "sketches": ["sacred", "geometry", "throne", "gilt", "phyllotaxis", "eye", "illuminati", "ascend", "cathedral"]},
+     "sketches": ["sacred", "geometry", "throne", "gilt", "eye", "illuminati", "ascend", "cathedral"]},
     {"id": "cosmic",  "name": "Cosmic",  "blurb": "Space, light and falling through it",
-     "sketches": ["horizon", "eclipse", "wormhole", "vertigo", "diamond", "orb", "aurora", "elevated"]},
+     "sketches": ["eclipse", "wormhole", "vertigo", "diamond", "aurora"]},
     {"id": "tales",   "name": "Tales",   "blurb": "Characters and stories",
      "sketches": ["inkwell", "sisyphus", "hypnotoad", "mouths", "labyrinth", "milking", "atlantis", "dragons"]},
     {"id": "signals", "name": "Signals", "blurb": "Secrets, surveillance and the unexplained",
      "sketches": ["area51", "cctv", "cipher", "redacted", "subliminal"]},
     {"id": "organic", "name": "Organic", "blurb": "Living patterns that grow",
-     "sketches": ["emergence", "seething", "seed", "reptile", "flow", "topo", "field"]},
+     "sketches": ["emergence", "reptile", "flow", "topo", "field"]},
     {"id": "luxe",    "name": "Luxe",    "blurb": "Shimmer, sheen and heat",
-     "sketches": ["artpop", "silk", "sequin", "tropical", "umbrella", "burn"]},
+     "sketches": ["artpop", "silk", "sequin", "umbrella"]},
     {"id": "lines",   "name": "Lines",   "blurb": "Waves, rhythm and the track itself",
-     "sketches": ["rings", "wavelength", "pendulum", "pipes", "track", "synthwave"]}
+     "sketches": ["wavelength", "synthwave"]}
   ]
 }
