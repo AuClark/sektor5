@@ -59,11 +59,12 @@ vec3 content(vec2 uv) {
   // Fill the screen: the rim goes out past the surface's corners (whatever its shape), so the maze
   // covers it all and the zones become rings across the whole picture.
   if (p_fill > 0.5) R = 0.5 * sqrt(u_aspect * u_aspect + 1.0) * (1.06 + 0.04 * k) + 0.12 * p_ragged;
+  float hole = p_fill > 0.5 ? 0.0 : p_hole;                         // filling the screen: no hole in the middle either
   float inside = smoothstep(-u_px, u_px, R - rr);
-  if (p_hole > 0.0) inside *= smoothstep(-u_px, u_px, rr - p_hole);
+  if (hole > 0.0) inside *= smoothstep(-u_px, u_px, rr - hole);
 
   // Zones: inner blue, a mixed band of pink / green / pale blue, outer teal.
-  float z = (rr - p_hole) / max(R - p_hole, 1e-3) + (vnoise(p * 6.0 + 40.0) - 0.5) * p_mix;
+  float z = (rr - hole) / max(R - hole, 1e-3) + (vnoise(p * 6.0 + 40.0) - 0.5) * p_mix;
   float pick = vnoise(mat2(0.6, 0.8, -0.8, 0.6) * p * 11.0 + 80.0);
   vec3 hs = z < 0.45 ? vec3(0.56, 0.62, 0.80)
           : z < 0.72 ? (pick < 0.4 ? vec3(0.92, 0.72, 0.86) : pick < 0.62 ? vec3(0.30, 0.58, 0.45) : vec3(0.60, 0.22, 0.88))
