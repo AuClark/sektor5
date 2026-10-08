@@ -15,6 +15,12 @@
       {"id": "drop",    "label": "Capstone lands on the drop",    "min": 0, "max": 1, "step": 0.01, "default": 1},
       {"id": "beam",    "label": "Beam to the apex on the drop",  "min": 0, "max": 1, "step": 1, "default": 1}
     ]},
+    {"name": "Trip", "params": [
+      {"id": "trip",   "label": "Spiral ground",                 "min": 0, "max": 1, "step": 0.01, "default": 0.6},
+      {"id": "echo",   "label": "Echoes on the beat",            "min": 0, "max": 1.5, "step": 0.01, "default": 0.7},
+      {"id": "melt",   "label": "Melt",                          "min": 0, "max": 1.5, "step": 0.01, "default": 0.5},
+      {"id": "cycle",  "label": "Colour cycle (turns per 64 beats)", "min": 0, "max": 1, "step": 0.01, "default": 0}
+    ]},
     {"name": "Colour", "params": [
       {"id": "pal",     "label": "Palette (0 desert, 1 the cover, 2 night, 3 pink)", "min": 0, "max": 3, "step": 1, "default": 0},
       {"id": "follow",  "label": "Shift by show hue",             "min": 0, "max": 1, "step": 1, "default": 0},

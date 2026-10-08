@@ -245,16 +245,25 @@ Shaders can't draw text by themselves, so `tools/glsltext.py` writes a 5x7 pixel
 
 ## Dinki Dell set
 
-Four sketches for the Dinki Dell doof, after its cover (theme **Dinki Dell**), **made for a triangle**: the pyramid faces. Each is one subject, centred where a triangle has the most room (about a third up from the base), on a flat colour, with nothing near the sides or the top, so a triangle with its sides trimmed still shows it all. They share the cover's look, soft clay on bright flat colour: every shape is a simple distance field (circles, capsules, triangles, rounded boxes), shaded by how its rim faces a light from the top left, with a soft shadow. They're cheap, 1.7–2.5 ms a 1920×1080 frame in Chrome here (`wavelength` 3.3).
+Four sketches for the Dinki Dell doof, after its cover (theme **Dinki Dell**), **made for a triangle**: the pyramid faces. Each is one subject, centred where a triangle has the most room (about a third up from the base), on a flat colour, with nothing near the sides or the top, so a triangle with its sides trimmed still shows it all. They share the cover's look, soft clay on bright flat colour: every shape is a simple distance field (circles, capsules, triangles, rounded boxes), shaded by how its rim faces a light from the top left, with a soft shadow. They're cheap, about 2–2.5 ms a 1920×1080 frame in Chrome here (`wavelength` 3.4).
 
 | Sketch | What it is | On the music | Presets |
 |---|---|---|---|
-| `doof` | The holding screen: one icon big in the middle (**Icon**: the eye in its sunburst, the quilted bee or the golden disc of glyphs) with DINKI DELL and doof across the bottom in lilac (stroke letters, not a font) | The letters hop in turn through the bar, the rays pulse and turn, the bee flaps on the kick, the eye looks round and blinks; the icon swells and the rays burst on the drop | eye, bee, disc, night |
-| `pyramids` | One pyramid (a pyramid on a pyramid) with a sun behind its tip and the capstone, the eye in a golden triangle, floating above | A band of light sweeps up the faces on every beat, the courses glinting in it; the capstone comes down through a build, lands on the drop and beams up to the apex | desert, cover, night, pink |
-| `sphinx` | The Sphinx face on as a bust: the headdress flaring to the shoulders like a pyramid, striped gold and blue, the cobra, the false beard, a broad striped collar, a sun behind | A ripple of light runs down the stripes on the beat, the eyes look round and blink; they glow red through a build and blaze with laser starbursts on the drop | desert, cover, night, pink |
-| `astronaut` | A chunky astronaut floating in the middle, a few stars | One arm waves, the chest buttons light in turn, the stars twinkle; the visor reflects a studio spotlight (it was filmed on a set). On the drop it does a full flip, the visor shows the eye and the stars burst | cover, space, pink, sky |
+| `doof` | The holding screen: one icon big in the middle (**Icon**: the eye in its sunburst, the quilted bee or the golden disc of glyphs) with DINKI DELL and doof across the bottom in lilac (stroke letters, not a font) | The letters hop in turn through the bar, the rays pulse and turn, the bee flaps on the kick, the eye looks round and blinks; the icon swells and the rays burst on the drop | eye, bee, disc, night, trip |
+| `pyramids` | One pyramid (a pyramid on a pyramid) with a sun behind its tip and the capstone, the eye in a golden triangle, floating above | A band of light sweeps up the faces on every beat, the courses glinting in it; the capstone comes down through a build, lands on the drop and beams up to the apex | desert, cover, night, pink, trip |
+| `sphinx` | The Sphinx face on as a bust: the headdress flaring to the shoulders like a pyramid, striped gold and blue, the cobra, the false beard, a broad striped collar, a sun behind | A ripple of light runs down the stripes on the beat, the eyes look round and blink; they glow red through a build and blaze with laser starbursts on the drop | desert, cover, night, pink, trip |
+| `astronaut` | A chunky astronaut floating in the middle, a few stars | One arm waves, the chest buttons light in turn, the stars twinkle; the visor reflects a studio spotlight (it was filmed on a set). On the drop it does a full flip, the visor shows the eye and the stars burst | cover, space, pink, sky, trip |
 
 Each has four palettes (the cover's lime, night and two more), Size and Height, and Follow the show's colour.
+
+**Trip** (every one of them, and a **trip** preset that turns it all up):
+- **Spiral ground:** the flat colour becomes a two-tone spiral in the palette's own colours (lime and lilac on the cover), five arms turning out of the subject a twentieth of a turn a beat, with a ring of light flowing outward every two beats.
+- **Echoes on the beat:** outlines of the subject ripple out from its edge on every beat, fainter on the off-beat.
+- **Melt:** a slow liquid wobble of the subject.
+- **Colour cycle** (off unless set): the whole palette rolls round the colour wheel, so many turns per 64 beats.
+- And each its own: `doof`'s rays undulate, its iris is a turning rainbow spiral, its letters wave and the disc's glyphs glow in rainbow; `pyramids` runs rainbow light up the stone courses; `sphinx`'s stripes flow down the cloth and turn rainbow, its irises spiral; `astronaut` flies through hyperspace (star streaks flowing out of the middle, rushing on the drop), turns slowly (**Spin**), and its visor swirls with colour.
+
+They stay cheap with all of it on: 2.1–2.4 ms a 1920×1080 frame here.
 
 ## Max Cooper set
 

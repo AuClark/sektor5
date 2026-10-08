@@ -5,7 +5,8 @@
 // build the eyes glow red, and on the drop they blaze with laser starbursts.
 // Simple shapes on a flat sky, nothing near the sides, so a trimmed triangle still shows it all.
 // Params are p_* uniforms; ranges and defaults are in sphinx.json.
-uniform float p_size, p_cy, p_sun, p_stripes, p_ripple, p_look, p_laser, p_beat, p_drop, p_pal, p_follow, p_bright;
+uniform float p_size, p_cy, p_sun, p_stripes, p_ripple, p_look, p_laser, p_beat, p_drop, p_pal, p_follow, p_bright,
+              p_trip, p_echo, p_melt, p_cycle;
 
 #define TAU 6.2831853
 #define PI 3.1415927
@@ -25,6 +26,35 @@ float sdTri(vec2 p, vec2 a, vec2 b, vec2 c) {   // a triangle, any winding (afte
 }
 float smin(float a, float b, float k) { float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
 float fill(float d) { return 1.0 - smoothstep(-u_px, u_px, d); }
+
+// ---------------------------------------------------------------- trip: the psychedelic layer
+// Turn a colour round the colour wheel, keeping its brightness (in YIQ).
+vec3 rotHue(vec3 c, float a) {
+  vec3 y = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312) * c;
+  float cs = cos(a * 6.2831853), sn = sin(a * 6.2831853);
+  y.yz = vec2(y.y * cs - y.z * sn, y.y * sn + y.z * cs);
+  return clamp(mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703) * y, 0.0, 1.0);
+}
+// The ground as a two-tone spiral (bg and b2) turning out of p = 0, rings flowing outward a beat at a time.
+vec3 spiral(vec3 bg, vec3 b2, vec2 p, float amt) {
+  if (amt <= 0.0) return bg;
+  float r = length(p) + 1e-3, a = atan(p.y, p.x), lr = log(r);
+  float arms = sin(a * 5.0 + lr * 5.0 - u_beat * 0.785);               // five arms, a twentieth of a turn a beat
+  float rings = sin(lr * 9.0 - u_beat * 3.1416);                         // a ring of light out from the middle every two beats
+  float m = smoothstep(-0.05, 0.05, arms) * clamp(amt, 0.0, 1.0);
+  return mix(bg, b2, m) * (1.0 + amt * (0.07 * rings + 0.1 * kick() * m));
+}
+// Lines rippling out from a shape (its distance d, outside it) once a beat, fainter on the off-beat.
+float echo(float d) {
+  float e = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float ph = fract(u_frac + 0.5 * float(i));
+    e += exp(-abs(d - ph * 0.14) / 0.0035) * (1.0 - ph) * (i == 0 ? 1.0 : 0.5);
+  }
+  return e * step(0.0, d);
+}
+// A slow liquid wobble.
+vec2 melt(vec2 q, float amt) { return q + amt * 0.012 * vec2(sin(q.y * 17.0 + u_beat * 1.5708), sin(q.x * 17.0 + u_beat * 1.5708 + 1.7)); }
 
 const vec2 LGT = vec2(-0.6, 0.8);
 const float BEV = 0.014;
@@ -64,8 +94,11 @@ vec3 content(vec2 uv) {
   else if (p_pal > 1.5 && p_pal < 2.5) { SKY = vec3(0.08, 0.05, 0.2); SKY2 = vec3(0.3, 0.1, 0.42); SUN = vec3(1.0, 0.45, 0.75); STONE = vec3(0.35, 0.85, 0.9); GOLD = vec3(1.0, 0.85, 0.35); LAPIS = vec3(0.55, 0.2, 0.9); RED = vec3(1.0, 0.4, 0.75); LASER = vec3(0.3, 1.0, 0.5); }
   else if (p_pal > 2.5) { SKY = vec3(0.99, 0.75, 0.82); SKY2 = vec3(1.0, 0.86, 0.7); SUN = vec3(1.0, 0.95, 0.6); STONE = vec3(0.99, 0.84, 0.72); LAPIS = vec3(0.9, 0.35, 0.55); RED = vec3(0.3, 0.6, 0.95); }
   if (hs != 0.0) { vec3 o = hsv(fract(hs), 0.3, 1.0); o /= max(max(o.r, o.g), o.b); SKY *= o; SKY2 *= o; }
+  float cyc = p_cycle * u_beat / 64.0;                                  // the palette rolling round the wheel
+  SKY = rotHue(SKY, cyc); SKY2 = rotHue(SKY2, cyc); SUN = rotHue(SUN, cyc); LAPIS = rotHue(LAPIS, cyc); RED = rotHue(RED, cyc);
 
-  vec3 col = mix(SKY2, SKY, smoothstep(-0.4, 0.4, q.y)) * (1.0 + 0.1 * dr);
+  vec3 sky = mix(SKY2, SKY, smoothstep(-0.4, 0.4, q.y));
+  vec3 col = spiral(sky, mix(sky, SUN, 0.55), q - vec2(0.0, 0.08), p_trip) * (1.0 + 0.1 * dr);   // a spiral turning out from behind the head
   // ---- the sun behind the head
   if (p_sun > 0.5) {
     vec2 sc = vec2(0.0, 0.1);
@@ -75,10 +108,13 @@ vec3 content(vec2 uv) {
   if ((abs(q.x) > 0.36 || q.y < -0.45 || q.y > 0.34) && dr < 0.01) return clamp(col * p_bright, 0.0, 1.0);
 
   // ---- the headdress: stripes across, a ripple of light running down them on the beat
+  col = mix(col, GOLD * 1.1, clamp(echo(nemes(q)) * p_echo, 0.0, 1.0));   // the headdress rippling out on the beat
+  q = melt(q, p_melt);
   float nd = nemes(q);
   col = shade(col, nemes(q - vec2(0.03, -0.02)));
-  float sy = q.y * p_stripes * 2.0;
-  vec3 cloth = mix(GOLD, LAPIS, step(0.5, fract(sy)));
+  float sy = (q.y + u_beat * 0.03 * p_trip) * p_stripes * 2.0;          // the stripes flow down the cloth on the trip
+  vec3 band2 = mix(LAPIS, hsv(floor(sy) * 0.13 - u_beat / 32.0, 0.75, 0.95), 0.8 * p_trip);   // and turn rainbow
+  vec3 cloth = mix(GOLD, band2, step(0.5, fract(sy)));
   float rip = p_ripple * exp(-abs(fract(-q.y * 1.6 - u_frac) - 0.5) * 10.0) * (0.4 + 0.6 * k);
   col = clay(col, cloth * (1.0 + 0.45 * rip), nd, nemes(q + LGT * 0.008));
   // A gold band across the brow.
@@ -114,7 +150,9 @@ vec3 content(vec2 uv) {
     col = mix(col, vec3(0.1, 0.08, 0.12), fill(min(abs(ed) - 0.003, sdSeg(em, vec2(0.022, 0.002), vec2(0.045, 0.008)) - 0.003)));
     col = mix(col, vec3(0.1, 0.08, 0.12), fill(sdSeg(em, vec2(-0.025, 0.026), vec2(0.03, 0.03)) - 0.003));   // the brow
     col = mix(col, vec3(0.99, 0.97, 0.92), fill(ed));
-    if (ed < 0.0) col = mix(col, mix(vec3(0.15, 0.1, 0.08), LASER, max(build, dr)), fill(length(e - look) - 0.009));
+    vec2 il = e - look;                                                // the iris: a rainbow spiral on the trip, red in a build
+    vec3 ic = mix(vec3(0.15, 0.1, 0.08), hsv(atan(il.y, il.x) / TAU + length(il) * 60.0 - u_beat * 0.5, 0.8, 1.0), 0.8 * p_trip);
+    if (ed < 0.0) col = mix(col, mix(ic, LASER, max(build, dr)), fill(length(il) - 0.009));
     col += LASER * exp(-length(e) / 0.018) * (0.7 * build + 1.4 * dr) * p_laser;
     // The drop: a starburst of laser lines out of each eye, turning, flickering on the 16ths.
     if (dr > 0.01 && p_laser > 0.0) {

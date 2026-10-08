@@ -4,7 +4,8 @@
 // On the drop the astronaut does a full flip, the visor shows the all-seeing eye and the stars burst.
 // Nothing sits near the sides, so a trimmed triangle still shows it all.
 // Params are p_* uniforms; ranges and defaults are in astronaut.json.
-uniform float p_size, p_cy, p_drift, p_wave, p_stars, p_flip, p_beat, p_drop, p_pal, p_follow, p_bright;
+uniform float p_size, p_cy, p_drift, p_wave, p_stars, p_flip, p_beat, p_drop, p_pal, p_follow, p_bright,
+              p_trip, p_echo, p_melt, p_spin, p_cycle;
 
 #define TAU 6.2831853
 #define PI 3.1415927
@@ -28,6 +29,35 @@ vec3 clay(vec3 col, vec3 base, float d, float dl) {
   return mix(col, c, a);
 }
 vec3 shade(vec3 col, float ds, float amt) { return col * (1.0 - amt * (1.0 - smoothstep(-0.01, 0.025, ds))); }
+
+// ---------------------------------------------------------------- trip: the psychedelic layer
+// Turn a colour round the colour wheel, keeping its brightness (in YIQ).
+vec3 rotHue(vec3 c, float a) {
+  vec3 y = mat3(0.299, 0.596, 0.211, 0.587, -0.274, -0.523, 0.114, -0.322, 0.312) * c;
+  float cs = cos(a * 6.2831853), sn = sin(a * 6.2831853);
+  y.yz = vec2(y.y * cs - y.z * sn, y.y * sn + y.z * cs);
+  return clamp(mat3(1.0, 1.0, 1.0, 0.956, -0.272, -1.106, 0.621, -0.647, 1.703) * y, 0.0, 1.0);
+}
+// The ground as a two-tone spiral (bg and b2) turning out of p = 0, rings flowing outward a beat at a time.
+vec3 spiral(vec3 bg, vec3 b2, vec2 p, float amt) {
+  if (amt <= 0.0) return bg;
+  float r = length(p) + 1e-3, a = atan(p.y, p.x), lr = log(r);
+  float arms = sin(a * 5.0 + lr * 5.0 - u_beat * 0.785);               // five arms, a twentieth of a turn a beat
+  float rings = sin(lr * 9.0 - u_beat * 3.1416);                         // a ring of light out from the middle every two beats
+  float m = smoothstep(-0.05, 0.05, arms) * clamp(amt, 0.0, 1.0);
+  return mix(bg, b2, m) * (1.0 + amt * (0.07 * rings + 0.1 * kick() * m));
+}
+// Lines rippling out from a shape (its distance d, outside it) once a beat, fainter on the off-beat.
+float echo(float d) {
+  float e = 0.0;
+  for (int i = 0; i < 2; i++) {
+    float ph = fract(u_frac + 0.5 * float(i));
+    e += exp(-abs(d - ph * 0.14) / 0.0035) * (1.0 - ph) * (i == 0 ? 1.0 : 0.5);
+  }
+  return e * step(0.0, d);
+}
+// A slow liquid wobble.
+vec2 melt(vec2 q, float amt) { return q + amt * 0.012 * vec2(sin(q.y * 17.0 + u_beat * 1.5708), sin(q.x * 17.0 + u_beat * 1.5708 + 1.7)); }
 
 // The astronaut, in its own space (a = arm wave 0..1). Parts: 0 suit, 1 backpack, 2 helmet.
 float pack(vec2 p) { return sdBox(p - vec2(0.0, -0.05), vec2(0.15, 0.13), 0.05); }
@@ -59,33 +89,36 @@ vec3 content(vec2 uv) {
   else if (p_pal > 1.5 && p_pal < 2.5) BG = vec3(0.98, 0.72, 0.78);
   else if (p_pal > 2.5) BG = vec3(0.55, 0.85, 0.95);
   if (hs != 0.0) { vec3 o = hsv(fract(hs), 0.3, 1.0); BG *= o / max(max(o.r, o.g), o.b); }
-  vec3 col = BG * (1.0 + 0.08 * dr);
+  float cyc = p_cycle * u_beat / 64.0;                                  // the palette rolling round the wheel
+  BG = rotHue(BG, cyc); VIS = rotHue(VIS, cyc); VIS2 = rotHue(VIS2, cyc);
+  vec3 B2 = p_pal > 0.5 && p_pal < 1.5 ? vec3(0.25, 0.1, 0.4) : mix(BG, vec3(0.62, 0.56, 0.76), 0.45);
+  vec3 col = spiral(BG, rotHue(B2, cyc), p - vec2(0.0, -0.085), p_trip) * (1.0 + 0.08 * dr);   // a spiral turning out from behind
 
-  // ---- stars: one in some cells of a grid, a four-point twinkle, brighter on the kick; they burst outward on the drop
+  // ---- hyperspace: star streaks flowing out from the astronaut, faster on the trip, rushing on the drop
   if (p_stars > 0.0) {
-    vec2 sp = p / (1.0 + 0.6 * dr);
-    vec2 cell = floor(sp * 7.0), f = fract(sp * 7.0) - 0.5;
+    vec2 s0 = p - vec2(0.0, -0.085);
+    float r = length(s0), ang = atan(s0.y, s0.x);
+    vec2 g = vec2(ang / TAU * 36.0, log(r + 0.02) * 6.0 - u_beat * (0.4 + 1.2 * p_trip) * (1.0 + 2.0 * dr));
+    vec2 cell = floor(g), f = fract(g) - 0.5;
     float hh = hash(cell);
-    if (hh > 0.55) {
-      vec2 o = (vec2(hash(cell + 3.1), hash(cell + 7.7)) - 0.5) * 0.6;
-      vec2 d = abs(f - o);
+    if (hh > 0.72) {
       float tw = 0.5 + 0.5 * sin(u_beat * PI * 0.5 + hh * 20.0);
-      float sz = (0.1 + 0.08 * tw + 0.12 * k * step(0.8, hh)) * p_stars;
-      float star = max((1.0 - smoothstep(0.0, sz, d.x + d.y * 6.0)), (1.0 - smoothstep(0.0, sz, d.y + d.x * 6.0)));
-      col = mix(col, STAR, star);
+      float streak = (1.0 - smoothstep(0.0, 0.1, abs(f.x))) * (1.0 - smoothstep(0.0, 0.25 + 0.35 * p_trip, abs(f.y)));
+      col = mix(col, STAR, clamp(streak * (0.5 + 0.5 * tw + 0.6 * k) * p_stars, 0.0, 1.0) * smoothstep(0.06, 0.16, r));
     }
   }
   // ---- where the astronaut is: drifting, tilting, flipping once on the drop
   vec2 c = vec2(-0.03 * p_size, -0.085 + p_cy) + p_drift * vec2(0.02 * sin(u_beat * PI / 16.0), 0.02 * sin(u_beat * PI / 8.0));
   float flip = p_flip * (abs(u_scene - 7.0) < 0.5 ? smoothstep(0.0, 4.0, u_since) * TAU : 0.0);
-  float tilt = p_drift * 0.12 * sin(u_beat * PI / 16.0 + 1.0) + flip;
-  vec2 a = rot(-tilt) * (p - c) / fit;
-  vec2 al = rot(-tilt) * (p - c + LGT * 0.008 * fit) / fit;
-  vec2 as = rot(-tilt) * (p - c - vec2(0.025, -0.02) * fit) / fit;
+  float tilt = p_drift * 0.12 * sin(u_beat * PI / 16.0 + 1.0) + flip + u_beat * p_spin * TAU / 64.0;
+  vec2 a = melt(rot(-tilt) * (p - c) / fit, p_melt);
+  vec2 al = melt(rot(-tilt) * (p - c + LGT * 0.008 * fit) / fit, p_melt);
+  vec2 as = melt(rot(-tilt) * (p - c - vec2(0.025, -0.02) * fit) / fit, p_melt);
   float wave = p_wave * (0.5 + 0.5 * sin(u_beat * PI));               // up and down once every two beats
 
   // ---- the astronaut
-  if (dot(a, a) < 0.36) {
+  if (dot(a, a) < 0.6) {
+    col = mix(col, vec3(1.0), clamp(echo(min(min(pack(a), suit(a, wave)), helmet(a)) * fit) * p_echo, 0.0, 1.0));   // outlines rippling out of it
     col = shade(col, min(min(pack(as), suit(as, wave)), helmet(as)) * fit, 0.2);
     col = clay(col, PACK, pack(a) * fit, pack(al) * fit);
     col = clay(col, SUIT, suit(a, wave) * fit, suit(al, wave) * fit);
@@ -106,6 +139,7 @@ vec3 content(vec2 uv) {
     float vd = sdEll(v, vec2(0.125, 0.095)) * fit;
     if (vd < u_px) {
       vec3 vc = mix(VIS2, VIS, smoothstep(-0.09, 0.08, v.y - v.x * 0.4));
+      vc = mix(vc, hsv(atan(v.y, v.x) / TAU * 2.0 + length(v) * 10.0 - u_beat * 0.5, 0.65, 0.95), 0.55 * p_trip);   // a swirl of colour in the glass
       // The reflection: a spotlight cone swinging across the glass, the set's lights at the top.
       float sw = 0.06 * sin(u_beat * PI / 4.0);
       float cone = (1.0 - smoothstep(0.0, 0.02, abs(v.x - sw - (v.y - 0.08) * 0.5) - (0.08 - v.y) * 0.25)) * step(v.y, 0.08);
