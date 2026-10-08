@@ -203,6 +203,8 @@
   .shuf .st b { color: var(--text); font-weight: 500; }
   .shuf .seg { display: grid; width: 100%; grid-auto-columns: minmax(0, 1fr); } .shuf .seg button { height: 30px; font-size: 12px; }
   .shuf.on { border-color: var(--accent-line); }
+  .shuf .ampill i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--dim); opacity: .45; vertical-align: 1px; }
+  .shuf .ampill.on i { background: var(--accent); opacity: 1; }
   .words { display: flex; gap: 8px; margin-top: 8px; }
   .words input { flex: 1; min-width: 0; height: var(--h-sm); padding: 0 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--border);
                  color: var(--text); font: 500 14px var(--font); outline: 0; transition: border-color .12s; }
@@ -620,7 +622,7 @@
         <div class="looklist" id="looklist"></div>
         <div class="shuf fo" id="shuf">
           <div class="row"><button class="ampill" id="shufOn" title="Mixes to another look from this theme every few bars, on the downbeat (L)"><i></i>Shuffle</button>
-            <span class="grow"></span><button class="chipbtn" id="shufSkip" title="Mix to the next look on the next downbeat">Skip</button></div>
+            <span class="grow"></span><button class="ampill" id="shufTrack" title="When a new track comes in, mix to a new look on its first downbeat (with Shuffle on or off)"><i></i>New track</button><button class="chipbtn" id="shufSkip" title="Mix to the next look on the next downbeat">Skip</button></div>
           <div class="st" id="shufSt">Off</div>
           <div class="seg sm" id="shufEvery" title="How often, in bars"><button data-v="1">1</button><button data-v="2">2</button><button data-v="4">4</button><button data-v="8">8</button><button data-v="16">16</button><button data-v="32">32</button></div>
         </div>
@@ -1062,12 +1064,14 @@ function paintShuffle() {
   if (!SHUF) return;
   $("shufOn").classList.toggle("on", !!SHUF.on); $("shuf").classList.toggle("on", !!SHUF.on);
   on("#shufEvery button", b => +b.dataset.v === SHUF.every);
+  $("shufTrack").classList.toggle("on", SHUF.track !== false);
   const th = THEMES.find(t => t.id === SHUF.theme), tn = th ? th.name : "all looks";
   const left = SHUF.left, when = left == null ? "on the next bar" : left <= 1 ? "on the next bar" : `in ${left} bars`;
-  $("shufSt").innerHTML = SHUF.on ? `Next ${when} · <b>${esc(tn)}</b>` : "Off · this look stays up";
+  $("shufSt").innerHTML = SHUF.on ? `Next ${when} · <b>${esc(tn)}</b>` : SHUF.track !== false ? "Off · a new look with each new track" : "Off · this look stays up";
 }
 $("shufOn").onclick = () => send("/api/shuffle", { on: !(SHUF && SHUF.on) }, "Shuffle");
 $("shufEvery").querySelectorAll("button").forEach(b => b.onclick = () => send("/api/shuffle", { every: +b.dataset.v }, "Shuffle"));
+$("shufTrack").onclick = () => send("/api/shuffle", { track: !(SHUF && SHUF.track !== false) }, "New track");
 $("shufSkip").onclick = async () => { if (await send("/api/shuffle", { skip: true }, "Skip")) toast("Next look on the next downbeat"); };
 loadLooks();
 
