@@ -829,6 +829,13 @@ def panel(ctx, w, h, role, state):
 
 # ---------------------------------------------------------------- par can (single DMX fixture)
 
+# WLED's "Party" palette, which the tubes' and pyramids' idle Aurora uses.
+PARTY = np.array([[0x55, 0x00, 0xAB], [0x84, 0x00, 0x7C], [0xB5, 0x00, 0x4B], [0xE5, 0x00, 0x1B],
+                  [0xE8, 0x17, 0x00], [0xB8, 0x47, 0x00], [0xAB, 0x77, 0x00], [0xAB, 0xAB, 0x00],
+                  [0xAB, 0x55, 0x00], [0xDD, 0x22, 0x00], [0xF2, 0x00, 0x0E], [0xC2, 0x00, 0x3E],
+                  [0x8F, 0x00, 0x71], [0x5F, 0x00, 0xA1], [0x2F, 0x00, 0xD0], [0x00, 0x07, 0xF9]], np.float32) / 255
+
+
 def par(ctx, role, state):
     """One RGB(W/A/UV) wash light. Returns dict of 0..1 values: dimmer, r, g, b, w, a, uv.
     W/A/UV are only used when the fixture config says those channels are verified."""
@@ -844,8 +851,12 @@ def par(ctx, role, state):
     if wave_on(ctx):
         c = wave_colour(ctx, wave_now(ctx)).tolist()
         out.update(r=c[0], g=c[1], b=c[2])
-    elif s == "IDLE":
-        colour(ctx["t"] * 0.01, 0.9, 0.15)            # slow dim colour drift
+    elif s == "IDLE":                                 # waiting: drift through WLED's Party palette, like the
+        x = (ctx["t"] / 40.0) % 1.0 * len(PARTY)      # WLED fixtures' idle Aurora, with a slow breathe
+        i = int(x)
+        c = lerp(PARTY[i], PARTY[(i + 1) % len(PARTY)], x - i)
+        v = 0.22 + 0.1 * math.sin(ctx["t"] * 2 * math.pi / 7)
+        out.update(r=float(c[0]) * v, g=float(c[1]) * v, b=float(c[2]) * v)
     elif s == "INTRO":
         colour(layer(ctx, place(role), 0.5), 0.8, 0.12 + 0.6 * min(1.0, hit(ctx, role) * drive(ctx)))
     elif s in ("GROOVE", "OUTRO", "PAUSED"):

@@ -294,7 +294,7 @@
     pill.innerHTML = { on: "<i></i>Sim", live: "<i></i>Live", none: "No decks" }[mode];
     spk.style.display = sim.on ? "" : "none";
     pill.title = { on: "Simulation: a synthetic DJ set. Tap for sound or to go back to the real decks.",
-                   live: `Live: ${sim.decks} deck${sim.decks === 1 ? "" : "s"} on DJ Link. Tap to switch to the simulation.`,
+                   live: `Live: ${sim.decks} deck${sim.decks === 1 ? "" : "s"} on DJ Link. The simulation is off while real decks are connected.`,
                    none: "No decks found. Tap to run a simulation." }[mode];
     if (pop.classList.contains("open")) popRender();
   }
@@ -303,8 +303,7 @@
     const live = !sim.on && sim.djlink && sim.decks > 0, canSim = sim.available;
     pop.className = "open" + (sim.on ? "" : " offer");
     pop.innerHTML = live
-      ? `<h4 style="color:#7ccf8a">Live</h4><p>${sim.decks} deck${sim.decks === 1 ? "" : "s"} on DJ Link: the lights follow the real set.</p>` +
-        (canSim ? `<div class="row"><button data-sim="on" class="wide" data-confirm="1">Switch to simulation</button></div>` : "")
+      ? `<h4 style="color:#7ccf8a">Live</h4><p>${sim.decks} deck${sim.decks === 1 ? "" : "s"} on DJ Link: the lights follow the real set. The simulation is only offered with no decks connected.</p>`
       : sim.on
       ? `<h4>Simulation</h4><p>A synthetic DJ set at ${Math.round(sim.bpm || 126)} BPM. The lights, projection and visuals follow it.</p>` +
         `<div class="row"><button data-sim="sound" class="${playing ? "go" : ""}">${playing ? "Sound on" : "Sound off"}</button>` +

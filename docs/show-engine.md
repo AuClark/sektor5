@@ -111,7 +111,7 @@ IDLE ──track playing──> GROOVE <─────────────�
 
 | Scene | Looks (tube and panel) | Timing |
 |---|---|---|
-| IDLE | WLED's own ambient effect (Pi stops streaming) | No deck playing |
+| IDLE | WLED's own ambient effect, Aurora on every WLED fixture (Pi stops streaming); the par can drifts through the same Party palette | No deck playing |
 | INTRO / OUTRO | A hit on every kick over a slow colour breath; the outro at 80% | Beat-locked |
 | GROOVE | Hard pulse on every beat, stronger on beat 1, a flick on the off-beat hi-hat; palette from the artwork or key; comet or chase every bar | Beat-locked |
 | BREAKDOWN | Slow breathing, desaturated, around 30% brightness, sparkles on the hi-hats | Bar-locked |

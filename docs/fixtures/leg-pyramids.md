@@ -90,7 +90,9 @@ Flash and join Wi-Fi as for the tubes ([tubes.md](tubes.md#3-flashing-wled-from-
 
 - Current limiter off (the strips have their own 12 V supply).
 - Names: `rave-pyramid-l` / `rave-pyramid-r` (mDNS), as for the tubes.
-- Preset 1, **Wiring check**, loads at boot: the legs red (front-left), green (front-right), blue (back-right) and white (back-left), the laser off. It shows which data line went to which leg.
+- Preset 1, **Aurora**, loads at boot and is the idle look: WLED's Aurora effect with the Party palette on each leg, the laser off, the same as the tubes.
+- Preset 2, **Wiring check**: the legs red (front-left), green (front-right), blue (back-right) and white (back-left), the laser off. It shows which data line went to which leg; load it for assembly.
+- WLED 16 ignores JSON API POSTs without `Content-Type: application/json` (it still answers), so send that header when scripting it.
 - WLED sync (UDP send and receive) off: a board with a laser must never follow other WLED devices.
 - Gotchas on this WLED build: output changes saved through `/json/cfg` only take effect after a real restart. On Pyramid L's board neither `{"rb":true}` nor `/reset` restarted it (its uptime kept counting); on Pyramid R's, `{"rb":true}` did. Check the uptime. Power-cycle it, or press EN, or use **Reboot** in WLED's settings. A pin WLED can't use is quietly swapped for another (asking for 14 gave 22), so read the outputs back after a restart.
 
