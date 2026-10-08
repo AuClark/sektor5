@@ -1,6 +1,8 @@
 {
   "_about": "Which theme each sketch belongs to, in the order the Visuals page shows them. Shuffle draws from one theme (or all of them). A sketch listed here that doesn't exist is skipped; a sketch that isn't listed shows under Other.",
   "themes": [
+    {"id": "dinki",   "name": "Dinki Dell", "blurb": "The doof's own: soft clay, the cover's colours",
+     "sketches": ["doof", "pyramids", "sphinx", "astronaut"]},
     {"id": "sacred",  "name": "Sacred",  "blurb": "Gold, geometry and temples",
      "sketches": ["sacred", "geometry", "throne", "gilt", "eye", "illuminati", "ascend", "cathedral"]},
     {"id": "cosmic",  "name": "Cosmic",  "blurb": "Space, light and falling through it",

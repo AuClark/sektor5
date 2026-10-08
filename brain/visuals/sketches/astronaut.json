@@ -1,0 +1,30 @@
+{
+  "title": "Astronaut",
+  "about": "A chunky clay astronaut floating in the middle of a flat bright sky, centred for a triangle surface, for the Dinki Dell doof. A few stars twinkle on the beat, one arm waves and the chest buttons light in turn; the visor reflects a studio spotlight (it was all filmed on a set). On the drop it does a full flip, the visor shows the all-seeing eye and the stars burst.",
+  "groups": [
+    {"name": "Scene", "params": [
+      {"id": "size",   "label": "Size",                          "min": 0.6, "max": 1.5, "step": 0.01, "default": 1},
+      {"id": "cy",     "label": "Height",                        "min": -0.15, "max": 0.15, "step": 0.005, "default": 0},
+      {"id": "stars",  "label": "Stars",                         "min": 0, "max": 1.5, "step": 0.01, "default": 1}
+    ]},
+    {"name": "Motion", "params": [
+      {"id": "drift",  "label": "Drift and tilt",                "min": 0, "max": 2, "step": 0.01, "default": 1},
+      {"id": "wave",   "label": "Wave",                          "min": 0, "max": 1, "step": 0.01, "default": 1},
+      {"id": "beat",   "label": "Beat punch",                    "min": 0, "max": 1, "step": 0.01, "default": 0.7},
+      {"id": "flip",   "label": "Flip on the drop",              "min": 0, "max": 1, "step": 1, "default": 1},
+      {"id": "drop",   "label": "Drop (eye in the visor, stars burst)", "min": 0, "max": 1, "step": 0.01, "default": 1}
+    ]},
+    {"name": "Trip", "params": [
+      {"id": "trip",   "label": "Spiral ground",                 "min": 0, "max": 1, "step": 0.01, "default": 0.6},
+      {"id": "echo",   "label": "Echoes on the beat",            "min": 0, "max": 1.5, "step": 0.01, "default": 0.7},
+      {"id": "melt",   "label": "Melt",                          "min": 0, "max": 1.5, "step": 0.01, "default": 0.5},
+      {"id": "spin",   "label": "Spin (turns per 64 beats)",     "min": -1, "max": 1, "step": 0.01, "default": 0.25, "kind": "rate"},
+      {"id": "cycle",  "label": "Colour cycle (turns per 64 beats)", "min": 0, "max": 1, "step": 0.01, "default": 0}
+    ]},
+    {"name": "Colour", "params": [
+      {"id": "pal",    "label": "Palette (0 the cover, 1 space, 2 pink, 3 sky)", "min": 0, "max": 3, "step": 1, "default": 0},
+      {"id": "follow", "label": "Shift by show hue",             "min": 0, "max": 1, "step": 1, "default": 0},
+      {"id": "bright", "label": "Brightness",                    "min": 0.5, "max": 1.5, "step": 0.01, "default": 1}
+    ]}
+  ]
+}
