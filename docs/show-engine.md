@@ -115,10 +115,24 @@ IDLE ──track playing──> GROOVE <─────────────�
 | INTRO / OUTRO | A hit on every kick over a slow colour breath; the outro at 80% | Beat-locked |
 | GROOVE | Hard pulse on every beat, stronger on beat 1, a flick on the off-beat hi-hat; palette from the artwork or key; comet or chase every bar | Beat-locked |
 | BREAKDOWN | Slow breathing, desaturated, around 30% brightness, sparkles on the hi-hats | Bar-locked |
-| **BUILD** | Brightness climbs; strobe rate doubles every 2 bars (1/4 → 1/8 → 1/16 → 1/32); fill rises up the tube; colour drifts to white; panel chase accelerates | Intensity = progress through the build window |
+| **BUILD** | One of five styles per build (below). All climb the same ladder (pulses at 1, 2, 4, 8 a beat at 0, 50, 75, 90% of the build) and go whiter into the drop | Intensity = progress through the build window |
 | HOLD | Freeze build intensity, keep strobing at the current rate | DJ is looping the build |
 | **PRE-DROP** | Near-blackout for the last beat (or half bar) | The "inhale" |
 | **DROP** | Full white hit on the drop beat, then 8-16 bars of the high-energy scene (strobe on the beat, saturated palette hits); **smoke burst** if armed | Fires early by the measured output latency |
+
+### Build styles
+
+Each build picks a style by the track and the drop, never the same as the last build (`_build_style()` in `showbrain.py`, `build_field()` in `looks.py`). The Commander's **Build style** row (under the Build buttons) latches one, or `{"cmd": "build_style", "value": "sweep"}` (`AUTO` hands it back). The state reports `build_style` during a build and `build_style_lock`.
+
+| Style | Look |
+|---|---|
+| Rise | The original: each fixture fills up (the tubes from the bottom, the pyramids in a spiral to the apex) as the strobe doubles and the colour goes white |
+| Sweep | One bright band scanning across the stage and back (pyramid, tube, par, tube, pyramid), faster and whiter towards the drop |
+| Converge | Each pulse runs from the outside fixtures in to the middle, the colour stepping through the palette; late on, the whole rig hits together |
+| Swell | Slow saturated breaths across the rig that shorten and brighten as the hue turns; a white flicker on the 8ths in the last bar |
+| Stutter | Left and right trade colour hits on a tightening grid, the middle on every hit (each side at most 4 a beat) |
+
+The panel keeps its own build look. The new styles are one field across the stage (place and height), so every fixture works out its part with nothing sent between them.
 
 Outside drops and builds the kick's punch scales with the track's energy in that bar (`drive()` in `looks.py`: 0.8× in the quietest bars, 1.3× in the loudest).
 
@@ -169,7 +183,7 @@ Robustness:
 - **Status and live view:** scene, live deck, "DROP in N beats", build progress, beat-in-bar, and a live colour strip of what every fixture is outputting right now.
 - **Performance pads (hold):** STROBE (locked to the beat at 1/4, 1/8 or 1/16, or FREE at 12 Hz), BLINDER (full white), BLACKOUT, and FLASH (tap: a white hit that decays over about a beat).
 - **Scenes (latch):** AUTO, AMBIENT, GROOVE, BREAK, DROP. A latched scene overrides the auto show until AUTO is pressed. DROP NOW and BUILD still take priority.
-- **Drop control:** DROP NOW, BUILD 2/4/8/16 bars, HOLD, CANCEL BUILD, SKIP NEXT DROP, MARK DROP HERE (saved as a per-track override).
+- **Drop control:** DROP NOW, BUILD 2/4/8/16 bars, BUILD STYLE (Auto or one of the five), HOLD, CANCEL BUILD, SKIP NEXT DROP, MARK DROP HERE (saved as a per-track override).
 - **Colour:** AUTO (from the track key), LOCK (tap a swatch), or CYCLE (moves round the wheel every 4 bars).
 - **Motion speed:** ½× (half-time), 1×, 2× (double-time) for the beat-driven looks.
 - **Movement:** how the lights play off each other (see [Interplay](#interplay-the-lights-play-off-each-other)): AUTO, or latch Together, Alternate, Call & answer, Bounce, Chase, Out or In. On Focus's Lights screen.
@@ -181,7 +195,7 @@ Robustness:
 
 **Colour from the visuals:** with the palette on `visuals`, the lights take the main colour of the projected picture. The first projector's output page shrinks each frame it has just drawn to 32×18 pixels about every 400 ms. It builds a hue histogram weighted by saturation × brightness, so dark and grey pixels don't count, and posts the strongest hue to the projector service (`/api/colour`). The projector service passes it on to showbrain (`POST /api/visual_colour`, open like `/api/screen`: it only stores the colour). Showbrain glides the lights' hue to it over about half a second, the short way round the colour wheel. Too little colour on screen sends `null`: the lights hold the last colour, then go back to the track's key colour after 5 s without a reading. `visual` in the state shows the latest reading and its age. On the Lighting page it's the **Visuals** colour button; in the Show app, **From the visuals**.
 
-API: `POST /api/cmd {"cmd": ..., "value": ...}` with `mode`, `follow`, `intensity`, `lead_ms`, `hold`, `strobe`, `strobe_div`, `auto_strobe` (true/false), `wave_lights` (`auto`, `on`, `off`), `blinder`, `black_hold`, `flash`, `look`, `play` (`AUTO`, `together`, `alternate`, `swap`, `bounce`, `chase`, `out`, `in`), `palette` (`{"mode", "hue"}`; mode `auto` (track key), `lock`, `cycle` or `visuals`), `speed`, `fixture` (`{"name", "on", "level"}`), `tap`, `tap_bpm`, `tap_sync`, `drop_now`, `build`, `skip_drop`, `mark_drop`, `clear`.
+API: `POST /api/cmd {"cmd": ..., "value": ...}` with `mode`, `follow`, `intensity`, `lead_ms`, `hold`, `strobe`, `strobe_div`, `auto_strobe` (true/false), `wave_lights` (`auto`, `on`, `off`), `blinder`, `black_hold`, `flash`, `look`, `play` (`AUTO`, `together`, `alternate`, `swap`, `bounce`, `chase`, `out`, `in`), `build_style` (`AUTO`, `rise`, `sweep`, `converge`, `swell`, `stutter`), `palette` (`{"mode", "hue"}`; mode `auto` (track key), `lock`, `cycle` or `visuals`), `speed`, `fixture` (`{"name", "on", "level"}`), `tap`, `tap_bpm`, `tap_sync`, `drop_now`, `build`, `skip_drop`, `mark_drop`, `clear`.
 
 ## Dashboard: waveforms and library
 
