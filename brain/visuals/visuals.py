@@ -447,6 +447,15 @@ def broadcast(obj):
     push(("data: " + json.dumps(obj, separators=(",", ":")) + "\n\n").encode())
 
 
+def live_title():
+    """The track the lights follow (None when nothing plays), from the last state we polled."""
+    try:
+        s = json.loads(last_state) or {}
+    except ValueError:
+        return None
+    return s.get("title") if s.get("live") else None
+
+
 def live_player():
     """showbrain's live deck, from the last state we polled."""
     try:
@@ -561,11 +570,13 @@ SHUFFLE_LEAD = 0.35                           # s
 # queue: the look to play at the next change, {"sketch", "preset" or None}, then random picks carry on.
 # out: per theme, what Shuffle leaves out: {theme: {"sketches": [...], "presets": {sketch: [...]}}}.
 # Both only steer Shuffle; anything can still be picked by hand.
-shuffle = {"on": False, "theme": "all", "every": 8, "queue": None, "out": {}}
+# track: a new track coming in (the lights moving to it) mixes to a new look on the next 1, Shuffle on or off.
+shuffle = {"on": False, "theme": "all", "every": 8, "queue": None, "out": {}, "track": True}
 current_preset = None   # the preset last loaded onto the active sketch, for Shuffle's status
 shuf_next = None        # the bar (on the downbeat grid) the next change lands on
 shuf_bar = None         # the bar it is now, as far as Shuffle last looked
 shuf_skip = False
+shuf_title = None       # the live deck's track, as Shuffle last saw it
 shuf_bags = {}          # what is left to play before anything repeats, per theme and per sketch
 
 
@@ -657,7 +668,7 @@ def shuffle_restore():
     """Shuffle survives a restart of the brain, on or off, so a set carries on."""
     try:
         d = json.loads((STATE / "shuffle.json").read_text())
-        shuffle_set({k: d[k] for k in ("on", "theme", "every") if k in d}, save=False)   # not the queue: a look firing by itself on a restart would be a surprise
+        shuffle_set({k: d[k] for k in ("on", "theme", "every", "track") if k in d}, save=False)   # not the queue: a look firing by itself on a restart would be a surprise
         for tid, o in (d.get("out") or {}).items():
             shuffle_set({"out": dict(o, theme=tid)}, save=False)
     except (OSError, ValueError, TypeError, AttributeError):
@@ -685,6 +696,8 @@ def shuffle_set(d, save=True):
         if on and not shuffle["on"]:
             shuf_next = None
         shuffle["on"] = on
+    if "track" in d:
+        shuffle["track"] = bool(d["track"])
     if d.get("skip"):
         shuf_skip = True                   # on the next downbeat; works with Shuffle off too
     if "queue" in d:
@@ -766,7 +779,7 @@ def shuffle_pick():
 def shuffle_loop():
     """Watch the bar count and change the look on the downbeat. Skip lands on the next 1, and
     works with Shuffle off too: it is "something else from this theme, in time"."""
-    global shuf_next, shuf_bar, shuf_skip
+    global shuf_next, shuf_bar, shuf_skip, shuf_title
     skip_at = None
     while True:
         time.sleep(0.04)
@@ -779,6 +792,14 @@ def shuffle_loop():
                 shuf_next, changed = bar + every, True
             if shuf_skip:
                 skip_at, shuf_skip, changed = bar + 1, False, True
+            # A new track has come in: a new look on its next 1. Not on a pause and resume of the same
+            # track, nor for whatever is already playing when the service starts.
+            title = live_title()
+            if title and title != shuf_title:
+                if shuf_title is not None and shuffle["track"]:
+                    log(f"shuffle: new track {title!r}: a new look on the next 1")
+                    skip_at, changed = bar + 1, True
+                shuf_title = title
             if shuffle["queue"] and not shuffle["on"] and skip_at is None:
                 skip_at, changed = bar + 1, True               # with Shuffle off, next up plays on the 1
             if skip_at is not None and bar < skip_at - 1:

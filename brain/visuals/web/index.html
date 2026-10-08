@@ -279,9 +279,10 @@
   .choosing .it.out .go { text-decoration: line-through; }
   .choosing .it.out .go::before { content: "–"; color: var(--dim); }
   /* Shuffle: one toggle, how often, skip, and a bar that fills to the next change. */
-  .shuffle { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: stretch; margin: 0 0 6px; }
+  .shuffle { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: stretch; margin: 0 0 6px; }
   .shuffle #bShuffle { padding: 10px 18px; min-width: 150px; text-align: left; }
   .shuffle #bShuffle.on { background: var(--accent); border-color: var(--accent); }
+  .shuffle #bTrack.on { color: var(--text); border-color: var(--accent); }
   .every { display: flex; border: 1px solid var(--line2); }
   .every span { align-self: center; padding: 0 10px; color: var(--dim); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
   .every button { flex: 1; border: 0; border-left: 1px solid var(--line); padding: 6px 4px; font-size: 12px; color: var(--nd2d2d2, #d2d2d2); }
@@ -302,7 +303,7 @@
   .choosebar .sp { flex: 1; }
   .choosebar #bChooseDone { background: var(--good); border-color: var(--good); color: var(--n050507, #050507); }
   #shufText b { color: var(--text); font-weight: 600; }
-  @media (max-width: 760px) { .shuffle { grid-template-columns: 1fr auto; } .every { grid-column: 1 / -1; grid-row: 2; } }
+  @media (max-width: 760px) { .shuffle { grid-template-columns: 1fr auto auto; } .every { grid-column: 1 / -1; grid-row: 2; } }
   /* In the strip under the display, so a Shuffle in progress shows whichever tab is open. */
   #shufPill { display: none; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--accent);
               color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .12em; cursor: pointer; }
@@ -454,6 +455,7 @@
         <button id="bShuffle" title="Every few bars, on the 1, a new sketch from this theme with one of its presets (S)">Shuffle</button>
         <div class="every" id="everyChips"><span>every</span></div>
         <button id="bSkip" title="Something else from this theme, on the next 1 (N)">Skip</button>
+        <button id="bTrack" title="When a new track comes in, mix to a new sketch from this theme on its first 1 (with Shuffle on or off)">New track</button>
       </div>
       <div class="shufstat"><i id="shufFill"></i></div>
       <p id="shufText"></p>
@@ -994,6 +996,7 @@ function paintShuffle() {
   const on = !!SHUF.on, th = themeNow().name;
   $("bShuffle").classList.toggle("on", on);
   $("bShuffle").textContent = on ? "Shuffle on" : "Shuffle";
+  $("bTrack").classList.toggle("on", SHUF.track !== false);
   const ev = $("everyChips");
   ev.innerHTML = `<span>every</span>` + EVERY.map(n =>
     `<button data-n="${n}" class="${n === SHUF.every ? "on" : ""}" title="${bars(n)}">${n}</button>`).join("") + `<span>bars</span>`;
@@ -1001,6 +1004,7 @@ function paintShuffle() {
   $("shufText").innerHTML = on
     ? `Next change in <b>${bars(SHUF.left || SHUF.every)}</b>, on the 1: a sketch from <b>${esc(th)}</b> with one of its presets.`
     : `Off. Turn it on for a new sketch from <b>${esc(th)}</b>, with one of its presets, every ${bars(SHUF.every)} on the 1. Picking one yourself gives it the full ${bars(SHUF.every)}.`;
+  if (SHUF.track !== false) $("shufText").innerHTML += ` <b>New track</b> is on: a new sketch from <b>${esc(th)}</b> on the first 1 of each new track.`;
   $("nowPreset").textContent = SHUF.playing === ACTIVE && SHUF.preset ? SHUF.preset : (lastPreset || "");
   // Next up: what the next change will be, if something is queued.
   const q = SHUF.queue;
@@ -1027,6 +1031,8 @@ $("bNextNow").onclick = () => { postShuffle({ skip: true }); flash("next on the 
 $("bNextClear").onclick = () => { SHUF.queue = null; paintShuffle(); paintPicker(); paintPresets(); postShuffle({ queue: null }); };
 $("bShuffle").onclick = () => { SHUF.on = !SHUF.on; paintShuffle(); postShuffle({ on: SHUF.on }); };
 $("bSkip").onclick = () => { postShuffle({ skip: true }); flash("next on the 1"); };
+$("bTrack").onclick = () => { SHUF.track = SHUF.track === false; paintShuffle(); postShuffle({ track: SHUF.track });
+  flash(SHUF.track ? "new track: new sketch" : "new track: look stays"); };
 // The bar under the buttons fills towards the next change, smoothly within the bar.
 (function shufFrame() {
   const f = R.lastFrame;
