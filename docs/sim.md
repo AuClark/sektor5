@@ -43,6 +43,15 @@ Press Ctrl-C to stop everything. Each service's log is in `brain/sim/logs/`. Edi
 
 **About `s5auth.js`:** on the brain, `deploy.sh` copies it next to each service. Locally, `run.sh` links it into place instead. The links are git-ignored.
 
+## On a Mac with the real rig
+
+`brain/sim/run_rig.sh` runs the same app on a Mac against the **real** rig instead of the synthetic one: deckdash on the decks over Pro DJ Link, the leg pyramids and rave tubes over the router's Wi-Fi, and the par can on a uDMX in the Mac. No Pi needed. `brain/sim/run_rig.sh stop` stops it; logs go to `brain/sim/logs/`.
+
+- **Network:** plug the rig router and the decks into the Mac's Ethernet. The router has no internet but offers itself as the gateway, so first run `sudo brain/tools/mac_rig_ethernet.sh` (a fixed address, no gateway: the internet stays on Wi-Fi), and once `sudo brain/tools/mac_rig_ethernet.sh permanent` (Wi-Fi first in the service order). Addresses come from `.env`: `S5_ROUTER_IP`, `S5_MAC_RIG_IP`.
+- **Needs:** Homebrew `openjdk@21` (it builds deckdash from the checkout when the sources change), numpy, and for the par can `pyusb` with Homebrew `libusb`.
+- **Fixtures** by their `.local` names, or `S5_PYRAMID_L_HOST` etc. in `.env`. No panel unless `S5_RIG_BOX_HOST` is set.
+- **Decks:** it starts on the real decks and waits with **NO DECKS** if there are none; the simulation is offered there, and switches itself off when real decks turn up.
+
 ## On the brain
 
 The brain can run the same synthetic rig, so a Pi on the bench (or at home, with no decks) shows the whole app working, and the real lights follow the generated set.
