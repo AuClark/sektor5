@@ -975,6 +975,20 @@ def par(ctx, role, state):
     return out
 
 
+# ---------------------------------------------------------------- mask eyes (worn by the DJ)
+
+WHITE_LED = np.array([1.0, 0.93, 0.82], np.float32)
+
+
+def eyes(ctx, n, role, state):
+    """The DJ's mask: two eyes of 3 LEDs, lit together. They follow the par can's wash (same colour,
+    same hits, white flash on the drop), with its white folded into RGB; amber and UV are left out.
+    Returns (n, 3) floats 0..1."""
+    v = par(ctx, role, state)
+    rgb = np.array([v["r"], v["g"], v["b"]], np.float32) * v["dimmer"] + WHITE_LED * v["w"]
+    return np.tile(np.clip(rgb, 0.0, 1.0), (n, 1)).astype(np.float32)
+
+
 # ---------------------------------------------------------------- breakdown looks
 
 def _eighth_ticks(state, beat):

@@ -83,6 +83,16 @@
         "a",
         "uv"
       ]
+    },
+    {
+      "name": "mask",
+      "kind": "eyes",
+      "host": "${S5_MASK_HOST:-s5-mask.local}",
+      "leds": 6,
+      "brightness": 0.6,
+      "role": {
+        "pos": 0
+      }
     }
   ],
   "mixer": {

@@ -107,6 +107,7 @@ All pages are served by the brain (`sektor5.local` on the rig's network). Changi
 | Battery RGBWA+UV uplight, anyma uDMX | Par can, 10-channel DMX at address 1 |
 | Projector with Chrome | Projection mapping and generative visuals |
 | Raspberry Pi 3 A+, SP901E amplifier, 2 × 5 m WS2815 (12 V) | LED pyramid (not in the show yet) |
+| ESP32-C3-Zero + WLED, 74AHCT125, 2 × 3-LED SK9822 boards, USB power bank | The DJ's mask eyes ([docs](docs/fixtures/mask.md)) |
 
 ## Working on it
 
@@ -114,7 +115,7 @@ All pages are served by the brain (`sektor5.local` on the rig's network). Changi
 - **Changes** go through a PR to `main`; collaborators merge their own. `main` is what's running. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Deploy:** `brain/deploy.sh live <target>` deploys `origin/main`, one target at a time: `deckdash`, `web`, `preview`, `showbrain`, `mixer`, `projector`, `visuals`, `tools`, `pyramid`, `panel`. With no target it deploys every brain service.
 - **Try page changes** at `:8080/preview/` against live data before going live.
-- **Add a fixture:** list it in [`brain/showbrain/config.json`](brain/showbrain/config.json) (`strip`, `panel` or `dmx_par`) and deploy `showbrain`.
+- **Add a fixture:** list it in [`brain/showbrain/config.json`](brain/showbrain/config.json) (`strip`, `panel`, `pyramid`, `eyes` or `dmx_par`) and deploy `showbrain`.
 - **Secrets and site settings** (Wi-Fi, host overrides) live in a git-ignored `.env`; copy [`.env.example`](.env.example). Settings are `S5_*` (old `RAVE_*` names still work). Never commit SSIDs, passwords or addresses.
 
 ## Rebuilding the rig
