@@ -837,7 +837,7 @@ UDMX_DEVICES = {}      # one UDMX per process, shared by every DMX fixture
 class Fixture:
     def __init__(self, cfg, index=0, group=1):
         self.cfg = cfg
-        self.kind = cfg["kind"]             # strip | panel | pyramid | dmx_par
+        self.kind = cfg["kind"]             # strip | panel | pyramid | eyes | dmx_par
         self.role = dict(cfg.get("role", {}), index=index, group=group, kind=self.kind)
         self.state = {}
         self.delay = cfg.get("delay_ms", 0) / 1000.0
@@ -863,7 +863,7 @@ class Fixture:
         self.mirrored = self.kind == "pyramid" and cfg.get("wiring") == "mirrored"
         self.diagonals = self.kind == "pyramid" and cfg.get("wiring") == "diagonals"
         self.role["mirrored"], self.role["diagonals"] = self.mirrored, self.diagonals
-        count = (cfg["leds"] if self.kind == "strip" else (self.legs if self.mirrored or self.diagonals else 4 * self.legs + 1)
+        count = (cfg["leds"] if self.kind in ("strip", "eyes") else (self.legs if self.mirrored or self.diagonals else 4 * self.legs + 1)
                  if self.kind == "pyramid" else self.w * self.h)
         ports = cfg.get("ports") or [4048, 4049]
         self.out = DDPOutput(cfg["host"], count, port=ports[0], brightness=cfg.get("brightness", 0.6), name=cfg.get("name"))
@@ -906,6 +906,8 @@ class Fixture:
                 px = looks.strip(ctx, self.cfg["leds"], self.role, self.state)
                 if self.cfg.get("reverse"):
                     px = px[::-1]
+            elif self.kind == "eyes":
+                px = looks.eyes(ctx, self.cfg["leds"], self.role, self.state)
             elif self.kind == "pyramid":
                 px = looks.pyramid(ctx, self.legs, self.role, self.state)
                 laser, px = px[-1, 0] > 0.5, px[:-1]
@@ -952,8 +954,8 @@ class Fixture:
             if peak > 1:                            # keep the hue, don't clip channels
                 rgb /= peak
             return ["#%02x%02x%02x" % tuple(int(round(x * 255)) for x in rgb)]
-        a = frame if self.kind in ("strip", "pyramid") else frame.mean(axis=0)
-        n = len(a) if self.kind == "pyramid" else min(len(a), 300 if self.kind == "strip" else 40)   # a pyramid's map must stay whole
+        a = frame if self.kind in ("strip", "pyramid", "eyes") else frame.mean(axis=0)
+        n = len(a) if self.kind in ("pyramid", "eyes") else min(len(a), 300 if self.kind == "strip" else 40)   # a pyramid's map must stay whole
         a = a[np.linspace(0, len(a) - 1, n).astype(int)] * self.out.brightness
         return ["#%02x%02x%02x" % tuple(px) for px in (np.clip(a, 0, 1) * 255).round().astype(int).tolist()]
 
