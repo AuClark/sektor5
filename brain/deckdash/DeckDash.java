@@ -112,13 +112,62 @@ public class DeckDash {
         // beat-link shuts the virtual CDJ down when the network goes from under it (an Ethernet blip,
         // a USB hub resetting, the computer sleeping) and never starts it again by itself: watch for
         // that and rejoin, so the show doesn't go deaf until someone restarts it.
+        // It also stays on the network it joined when the decks move to another (they took
+        // self-assigned 169.254 addresses, then got the router's after a replug): rejoin on theirs.
+        long offSince = 0;
+        Set<String> warned = new HashSet<>();
         while (true) {
             Thread.sleep(2000);
             if (!vcdj.isRunning()) {
                 log("lost the DJ Link network (Ethernet dropped?): rejoining");
                 joinDecks(vcdj);
+                offSince = 0;
+                continue;
+            }
+            List<DeviceAnnouncement> ds = new ArrayList<>(DeviceFinder.getInstance().getCurrentDevices());
+            if (!ds.isEmpty() && ds.stream().noneMatch(d -> onOurNetwork(vcdj, d.getAddress()))) {
+                if (offSince == 0) offSince = System.currentTimeMillis();
+                else if (System.currentTimeMillis() - offSince > 6000) {
+                    log("the decks are on another network now (" + seenDecks() + "): rejoining on it");
+                    vcdj.stop();
+                    joinDecks(vcdj);
+                    offSince = 0;
+                }
+            } else offSince = 0;
+            // A deck on a self-assigned address can be heard (beat, tempo, play state: the lights follow
+            // it), but this computer's requests for its track info go from its main address, which the
+            // deck can't answer: no titles, waveforms, beat grids or drops. Say so once per address.
+            for (DeviceAnnouncement d : ds) {
+                String a = d.getAddress().getHostAddress();
+                if (a.startsWith("169.254.") && warned.add(d.getDeviceNumber() + "@" + a))
+                    log(d.getDeviceName() + " #" + d.getDeviceNumber() + " is on a self-assigned address (" + a + "): it missed "
+                            + "the router's DHCP. Beat and play state work, but no track info (titles, waveforms, drops) until "
+                            + "its Ethernet is replugged with the router on");
             }
         }
+    }
+
+    /** Whether ADDR is on the network the virtual CDJ joined. */
+    static boolean onOurNetwork(VirtualCdj vcdj, java.net.InetAddress addr) {
+        try {
+            java.net.InetAddress local = vcdj.getLocalAddress();
+            java.net.NetworkInterface ni = java.net.NetworkInterface.getByInetAddress(local);
+            if (ni == null) return false;
+            for (java.net.InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                if (!local.equals(ia.getAddress())) continue;
+                byte[] x = local.getAddress(), y = addr.getAddress();
+                if (x.length != y.length) return false;
+                int bits = ia.getNetworkPrefixLength();
+                for (int i = 0; i < x.length; i++) {
+                    int m = bits >= 8 ? 0xff : bits <= 0 ? 0 : (0xff << (8 - bits)) & 0xff;
+                    if ((x[i] & m) != (y[i] & m)) return false;
+                    bits -= 8;
+                }
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return true;                                   // can't tell: leave it be
     }
 
     /** Join the DJ Link network (retrying until there is one) and start the data finders. */
