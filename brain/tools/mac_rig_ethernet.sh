@@ -76,4 +76,4 @@ echo "\"$svc\" is now $ADDR, no gateway, plus $LL_ADDR (\"$LL_SVC\") for decks o
 echo -n "Router ($S5_ROUTER_IP): "; ping -c1 -t2 "$S5_ROUTER_IP" >/dev/null && echo ok || echo "no answer"
 echo -n "Internet (1.1.1.1):   "; ping -c1 -t2 1.1.1.1 >/dev/null && echo ok || echo "no answer: check Wi-Fi is connected"
 echo -n "Default route:        "; route -n get default 2>/dev/null | awk '/interface/{print $2}'
-for h in "${S5_PYRAMID_L_HOST:-rave-pyramid-l.local}" "${S5_PYRAMID_R_HOST:-rave-pyramid-r.local}"; do echo -n "Pyramid $h: "; ping -c1 -t2 "$h" >/dev/null && echo ok || echo "not answering (powered? on the router's Wi-Fi?)"; done
+for h in "${S5_PYRAMID_L_HOST:-rave-pyramid-l.local}" "${S5_PYRAMID_R_HOST:-rave-pyramid-r.local}"; do echo -n "Pyramid $h: "; ( ping -c1 -t2 "$h" >/dev/null 2>&1 ) 2>/dev/null && echo ok || echo "not answering (powered? on the router's Wi-Fi?)"; done
