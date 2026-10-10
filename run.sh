@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Run the Sektor5 show on this Mac against the REAL rig: the decks over Pro DJ Link, the leg
+# Launch the Sektor5 show on this Mac against the real rig: the decks over Pro DJ Link, the leg
 # pyramids and rave tubes over the rig router's Wi-Fi, and the par can on a uDMX. No Pi needed.
-# (brain/sim/run.sh is the same app against a synthetic rig.) See docs/sim.md.
+# See docs/sim.md ("On a Mac with the real rig"). brain/sim/run.sh is the developer sim: the same
+# app against a synthetic rig, nothing real.
 #
-#   brain/sim/run_rig.sh          start it in the background (logs in brain/sim/logs/)
-#   brain/sim/run_rig.sh stop     stop it
+#   ./run.sh          start it in the background (logs in logs/)
+#   ./run.sh stop     stop it
 #
 # The Mac goes on the router by Ethernet (brain/tools/mac_rig_ethernet.sh keeps the internet on
 # Wi-Fi), and so do the decks. With no decks found it waits for them; the NO DECKS pill offers the
@@ -13,9 +14,9 @@
 # Needs: Homebrew openjdk@21 (deckdash), numpy, and for the par can pyusb + Homebrew libusb.
 # Hosts come from .env (S5_PYRAMID_L_HOST etc.), else the .local names.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")"
 REPO="$PWD"
-LOGS="$REPO/brain/sim/logs"
+LOGS="$REPO/logs"
 PAT="brain/sim/fakerig.py|$HOME/sim/fakerig.py|brain/showbrain/showbrain.py|brain/projector/projector.py 8100|brain/visuals/visuals.py 8110|DeckDash|caffeinate -ims -w"
 
 if [ "${1:-}" = stop ]; then
@@ -57,7 +58,7 @@ if [ ! -f "$DD/classes/DeckDash.class" ] || [ -n "$(find "$DD" -maxdepth 1 -name
   "$JDK/bin/javac" -nowarn -d "$DD/classes" -cp "$DD/lib/*" "$DD"/*.java 2>&1 | grep -v "^Note:" || true
 fi
 [ -e "$HOME/sim" ] || ln -s "$REPO/brain/sim" "$HOME/sim"
-WEB="$LOGS/deckdash-web"                                                # deckdash's pages plus the shared ones
+WEB="$LOGS/deckdash-web"                                                # deckdash's pages plus the shared ones (links)
 mkdir -p "$WEB"
 for f in "$DD"/web/* brain/common/web/*; do ln -sfn "$REPO/$f" "$WEB/$(basename "$f")"; done
 (cd "$DD" && exec nohup "$JDK/bin/java" -Djava.awt.headless=true -Xmx768m -Dweb="$WEB" -Dpreview="$WEB" \

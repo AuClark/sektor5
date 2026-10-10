@@ -8,11 +8,13 @@ brain/visuals/state/
 brain/sim/.venv/
 .venv/
 brain/sim/logs/
+# ./run.sh's logs (and deckdash's page links)
+logs/
 # s5auth.js links made by brain/sim/run.sh (deploy.sh copies the real file to the brain)
 brain/showbrain/s5auth.js
 brain/projector/web/s5auth.js
 brain/visuals/web/s5auth.js
 fixtures/holofan/capture/*.bin
-# deckdash's jars (fetch_libs.sh) and a local build (brain/sim/run_rig.sh)
+# deckdash's jars (fetch_libs.sh) and a local build (./run.sh)
 brain/deckdash/lib/
 brain/deckdash/classes/
