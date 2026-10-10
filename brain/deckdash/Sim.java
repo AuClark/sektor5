@@ -45,7 +45,7 @@ public class Sim {
         boolean dj = org.deepsymmetry.beatlink.VirtualCdj.getInstance().isRunning();
         int devices = realDecks();
         return new DeckDash.Json().obj().bool("on", on()).bool("available", available()).num("bpm", bpm)
-                .num("since", on() ? startedAt : 0).bool("djlink", dj).num("decks", devices)
+                .num("since", on() ? startedAt : 0).bool("djlink", dj).num("decks", devices).num("selfAssigned", selfAssigned())
                 .num("uptime_s", (System.currentTimeMillis() - DeckDash.started) / 1000).end().toString();
     }
 
@@ -63,6 +63,16 @@ public class Sim {
             }
         }
         DeckDash.send(ex, 200, "application/json", json().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Decks on self-assigned (169.254) addresses: heard, but no track info for them. */
+    static int selfAssigned() {
+        org.deepsymmetry.beatlink.DeviceFinder f = org.deepsymmetry.beatlink.DeviceFinder.getInstance();
+        if (!f.isRunning()) return 0;
+        int n = 0;
+        for (org.deepsymmetry.beatlink.DeviceAnnouncement d : f.getCurrentDevices())
+            if (d.getAddress().getHostAddress().startsWith("169.254.")) n++;
+        return n;
     }
 
     /** Real Pro DJ Link gear on the network (players, mixers). */

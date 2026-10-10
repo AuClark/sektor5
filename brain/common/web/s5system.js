@@ -303,7 +303,8 @@
     const live = !sim.on && sim.djlink && sim.decks > 0, canSim = sim.available;
     pop.className = "open" + (sim.on ? "" : " offer");
     pop.innerHTML = live
-      ? `<h4 style="color:#7ccf8a">Live</h4><p>${sim.decks} deck${sim.decks === 1 ? "" : "s"} on DJ Link: the lights follow the real set. The simulation is only offered with no decks connected.</p>`
+      ? `<h4 style="color:#7ccf8a">Live</h4><p>${sim.decks} deck${sim.decks === 1 ? "" : "s"} on DJ Link: the lights follow the real set. The simulation is only offered with no decks connected.</p>` +
+        (sim.selfAssigned ? `<p style="color:#f2b84b">${sim.selfAssigned} deck${sim.selfAssigned === 1 ? " is" : "s are"} on a self-assigned address (it missed the router): the beat works, but no track info (titles, waveforms, drops). Replug ${sim.selfAssigned === 1 ? "its" : "their"} Ethernet with the router on.</p>` : "")
       : sim.on
       ? `<h4>Simulation</h4><p>A synthetic DJ set at ${Math.round(sim.bpm || 126)} BPM. The lights, projection and visuals follow it.</p>` +
         `<div class="row"><button data-sim="sound" class="${playing ? "go" : ""}">${playing ? "Sound on" : "Sound off"}</button>` +

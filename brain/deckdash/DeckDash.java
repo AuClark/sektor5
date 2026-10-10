@@ -108,9 +108,106 @@ public class DeckDash {
 
         // Join the decks last: the dashboard, API and System view are up without them (decks off,
         // a new brain on the bench), and the players appear whenever the DJ Link network does.
+        joinDecks(vcdj);
+        // beat-link shuts the virtual CDJ down when the network goes from under it (an Ethernet blip,
+        // a USB hub resetting, the computer sleeping) and never starts it again by itself; it also stays
+        // on the network it joined when the decks move to another (they took self-assigned 169.254
+        // addresses, then got the router's after a replug). Rejoining in the same process gets the beat
+        // back but not the track info (the metadata finders don't pick the loaded tracks up again), so
+        // exit with REJOIN and let the supervisor start us fresh: ./run.sh's loop on a Mac, systemd's
+        // Restart=always on the brain. A fresh start is back with everything in about 5 s.
+        long offSince = 0;
+        Set<String> warned = new HashSet<>();
+        while (true) {
+            Thread.sleep(2000);
+            if (!vcdj.isRunning()) {
+                log("lost the DJ Link network (Ethernet dropped?): restarting to rejoin");
+                System.exit(REJOIN);
+            }
+            List<DeviceAnnouncement> ds = new ArrayList<>(DeviceFinder.getInstance().getCurrentDevices());
+            boolean wrongSide = selfAssigned(vcdj.getLocalAddress()) && ds.stream().anyMatch(d -> !selfAssigned(d.getAddress()));
+            if (!ds.isEmpty() && (wrongSide || ds.stream().noneMatch(d -> onOurNetwork(vcdj, d.getAddress())))) {
+                if (offSince == 0) offSince = System.currentTimeMillis();
+                else if (System.currentTimeMillis() - offSince > 6000) {
+                    log("the decks are on another network now (" + seenDecks() + "): restarting to rejoin on it");
+                    System.exit(REJOIN);
+                }
+            } else offSince = 0;
+            // A deck on a self-assigned address can be heard (beat, tempo, play state: the lights follow
+            // it), but this computer's requests for its track info go from its main address, which the
+            // deck can't answer: no titles, waveforms, beat grids or drops. Say so once per address.
+            for (DeviceAnnouncement d : ds) {
+                String a = d.getAddress().getHostAddress();
+                if (a.startsWith("169.254.") && warned.add(d.getDeviceNumber() + "@" + a))
+                    log(d.getDeviceName() + " #" + d.getDeviceNumber() + " is on a self-assigned address (" + a + "): it missed "
+                            + "the router's DHCP. Beat and play state work, but no track info (titles, waveforms, drops) until "
+                            + "its Ethernet is replugged with the router on");
+            }
+        }
+    }
+
+    static boolean selfAssigned(java.net.InetAddress a) {
+        return a != null && a.getHostAddress().startsWith("169.254.");
+    }
+
+    /** Whether ADDR is on the network the virtual CDJ joined. */
+    static boolean onOurNetwork(VirtualCdj vcdj, java.net.InetAddress addr) {
+        try {
+            java.net.InetAddress local = vcdj.getLocalAddress();
+            java.net.NetworkInterface ni = java.net.NetworkInterface.getByInetAddress(local);
+            if (ni == null) return false;
+            for (java.net.InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                if (!local.equals(ia.getAddress())) continue;
+                byte[] x = local.getAddress(), y = addr.getAddress();
+                if (x.length != y.length) return false;
+                int bits = ia.getNetworkPrefixLength();
+                for (int i = 0; i < x.length; i++) {
+                    int m = bits >= 8 ? 0xff : bits <= 0 ? 0 : (0xff << (8 - bits)) & 0xff;
+                    if ((x[i] & m) != (y[i] & m)) return false;
+                    bits -= 8;
+                }
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return true;                                   // can't tell: leave it be
+    }
+
+    /** Exit code asking the supervisor (./run.sh, systemd) for a fresh start to rejoin the decks. */
+    static final int REJOIN = 75;
+
+    /** Join the DJ Link network (retrying until there is one) and start the data finders. */
+    static void joinDecks(VirtualCdj vcdj) throws Exception {
         log("waiting for DJ Link devices...");
-        while (!vcdj.start()) {
-            log("no DJ Link network yet, retrying in 5 s");
+        String lastSeen = null;
+        DeviceFinder finder = DeviceFinder.getInstance();
+        finder.start();
+        while (true) {
+            // With some decks on the router's addresses and some self-assigned (they missed its DHCP),
+            // join the router's side: only there do we get track info, and the others join it once
+            // replugged. The virtual CDJ joins the network of whichever deck it hears first, so keep
+            // the self-assigned ones out of its sight while it joins.
+            Thread.sleep(1500);                            // hear the decks that are there
+            List<java.net.InetAddress> hidden = new ArrayList<>();
+            List<DeviceAnnouncement> now = new ArrayList<>(finder.getCurrentDevices());
+            if (now.stream().anyMatch(d -> !selfAssigned(d.getAddress())))
+                for (DeviceAnnouncement d : now)
+                    if (selfAssigned(d.getAddress())) { finder.addIgnoredAddress(d.getAddress()); hidden.add(d.getAddress()); }
+            boolean ok = vcdj.start();
+            for (java.net.InetAddress a : hidden) finder.removeIgnoredAddress(a);    // heard again: for the warning
+            if (ok) break;
+            String seen = seenDecks();
+            if (!seen.equals(lastSeen)) {                  // say what's wrong once, not every 5 s
+                lastSeen = seen;
+                if (seen.isEmpty()) log("no DJ Link network yet (no decks heard), retrying every 5 s. If the decks are on and "
+                        + "can see each other, they may be on self-assigned 169.254 addresses this computer can't hear: "
+                        + "give its rig Ethernet one too (sudo brain/tools/mac_rig_ethernet.sh), or replug the decks' Ethernet");
+                else if (seen.contains("169.254.")) log("decks heard (" + seen + ") on self-assigned addresses: they missed "
+                        + "the router's DHCP (on before the router was up?). Unplug and replug each deck's Ethernet, or "
+                        + "restart the decks with the router already on. Retrying every 5 s");
+                else log("decks heard (" + seen + ") but no network interface of this computer is on their subnet; "
+                        + "retrying every 5 s");
+            }
             Thread.sleep(5000);
         }
         log("joined as device " + vcdj.getDeviceNumber() + " on " + vcdj.getLocalAddress());
@@ -135,6 +232,18 @@ public class DeckDash {
                 log(name + " failed to start: " + e);
             }
         }
+    }
+
+    /** The DJ Link devices heard so far, "name #n at address, ...", for the join diagnostics. */
+    static String seenDecks() {
+        DeviceFinder f = DeviceFinder.getInstance();
+        if (!f.isRunning()) return "";
+        StringBuilder b = new StringBuilder();
+        for (DeviceAnnouncement d : f.getCurrentDevices()) {
+            if (b.length() > 0) b.append(", ");
+            b.append(d.getDeviceName()).append(" #").append(d.getDeviceNumber()).append(" at ").append(d.getAddress().getHostAddress());
+        }
+        return b.toString();
     }
 
     // ---------- HTTP ----------

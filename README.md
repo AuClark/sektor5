@@ -137,4 +137,5 @@ All pages are served by the brain (`sektor5.local` on the rig's network). Changi
 ## Next
 
 Pyramid pixel map and looks, drop-prediction calibration, and laser and smoke outputs. Smoke will have hardware-enforced off-by-default, burst limits and arming. The brain is `sektor5` (the old `ravecave.local` still answers for now). The fixtures' hostnames, service account and `/srv/rave` paths still use the old Rave Cave name and move to `s5-box` / `s5-tube-N` in a later rename; logos and colours are in [docs/brand/](docs/brand/).
+- **Running the show from a Mac:** `./run.sh` launches it against the real rig (decks, pyramids, tubes, par can); `./run.sh stop` stops it. See [docs/sim.md](docs/sim.md#on-a-mac-with-the-real-rig).
 - **No hardware?** `brain/sim/run.sh` runs the whole app on your computer against a synthetic rig: decks, mixer and an auto-mixed set. See [docs/sim.md](docs/sim.md).

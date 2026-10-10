@@ -45,12 +45,29 @@ Press Ctrl-C to stop everything. Each service's log is in `brain/sim/logs/`. Edi
 
 ## On a Mac with the real rig
 
-`brain/sim/run_rig.sh` runs the same app on a Mac against the **real** rig instead of the synthetic one: deckdash on the decks over Pro DJ Link, the leg pyramids and rave tubes over the router's Wi-Fi, and the par can on a uDMX in the Mac. No Pi needed. `brain/sim/run_rig.sh stop` stops it; logs go to `brain/sim/logs/`.
+`./run.sh`, at the root of the repo, launches the same app on a Mac against the **real** rig instead of the synthetic one: deckdash on the decks over Pro DJ Link, the leg pyramids and rave tubes over the router's Wi-Fi, and the par can on a uDMX in the Mac. No Pi needed. `./run.sh stop` stops it; logs go to `logs/`.
 
-- **Network:** plug the rig router and the decks into the Mac's Ethernet. The router has no internet but offers itself as the gateway, so first run `sudo brain/tools/mac_rig_ethernet.sh` (a fixed address, no gateway: the internet stays on Wi-Fi), and once `sudo brain/tools/mac_rig_ethernet.sh permanent` (Wi-Fi first in the service order). Addresses come from `.env`: `S5_ROUTER_IP`, `S5_MAC_RIG_IP`.
+- **Network:** plug the rig router and the decks into the Mac's Ethernet. The router has no internet but offers itself as the gateway, so first run `sudo brain/tools/mac_rig_ethernet.sh` (a fixed address, no gateway: the internet stays on Wi-Fi), and once `sudo brain/tools/mac_rig_ethernet.sh permanent` (Wi-Fi first in the service order). Addresses come from `.env`: `S5_ROUTER_IP`, `S5_MAC_RIG_IP`. It also gives that Ethernet a self-assigned 169.254.x.x address (a second network service on the same port, which macOS keeps): decks switched on before the router is ready give themselves 169.254 addresses, still see each other, and without it the Mac can't hear them at all. `undo` removes both.
 - **Needs:** Homebrew `openjdk@21` (it builds deckdash from the checkout when the sources change), numpy, and for the par can `pyusb` with Homebrew `libusb`.
 - **Fixtures** by their `.local` names, or `S5_PYRAMID_L_HOST` etc. in `.env`. No panel unless `S5_RIG_BOX_HOST` is set.
 - **Decks:** it starts on the real decks and waits with **NO DECKS** if there are none; the simulation is offered there, and switches itself off when real decks turn up.
+
+### Deck connection tests
+
+Run these on the rig after changing deckdash, the run script or the network, with `python3 brain/tools/djlink_watch.py` open in a terminal: it prints a line whenever the connection, the decks, the deck the lights follow or the par can's USB DMX change, and how long the connection took to come back. Pass when the watcher shows `joined` with both decks, and the lights follow a playing deck, within the time given. No step may need a restart of the show.
+
+| # | Do | Pass |
+|---|---|---|
+| 1 | Cold start: router on for a minute, decks on, Mac plugged in, then `./run.sh` | `joined`, both decks, within 15 s |
+| 2 | With a track playing, unplug the Mac's Ethernet for 10 s, plug it back | `lost the DJ Link network: rejoining` then `joined` in `deckdash.log`; back within 15 s; the lights follow the same deck and track |
+| 3 | Unplug the whole USB-C hub for 10 s, plug it back | As 2, and the par can's DMX `connected` again |
+| 4 | Unplug one deck's Ethernet for 10 s, plug it back | The other deck keeps driving the show; the unplugged one comes back by itself |
+| 5 | Start the show with the Mac's Ethernet unplugged, then plug it in | It waits (`NO DECKS`); joins by itself within 15 s of plugging in |
+| 6 | Restart the router with the decks on | The show waits, then joins the decks on the router's addresses. A deck that asks for an address before the router's DHCP is up takes a self-assigned 169.254 one and keeps it (seen 2026-10-10); the show then joins the router's side anyway, the beat still works, and the Live pill says to replug that deck |
+
+**Keeping the decks on the router's addresses.** XDJs have no static IP setting, and after a failed DHCP request they keep a self-assigned address until their Ethernet is replugged. A router restart drops their link, and they ask again before its DHCP is up. So: put a small unmanaged switch between the router and the decks + Mac (the decks' links stay up through a router restart, so they keep their addresses); reserve each deck's address in the router's DHCP settings; and on a cold start, power the router about a minute before the decks.
+| 7 | Leave the Mac idle (lid open) for 15 min with the show running | Still `joined`; the run script keeps the Mac awake (`caffeinate`) |
+| 8 | With decks connected, try **Start simulation** (`POST /api/sim {"on":true}`); then unplug both decks | Refused while decks are there; **NO DECKS** offers it once they're gone |
 
 ## On the brain
 
