@@ -47,7 +47,7 @@ Press Ctrl-C to stop everything. Each service's log is in `brain/sim/logs/`. Edi
 
 `./run.sh`, at the root of the repo, launches the same app on a Mac against the **real** rig instead of the synthetic one: deckdash on the decks over Pro DJ Link, the leg pyramids and rave tubes over the router's Wi-Fi, and the par can on a uDMX in the Mac. No Pi needed. `./run.sh stop` stops it; logs go to `logs/`.
 
-- **Network:** plug the rig router and the decks into the Mac's Ethernet. The router has no internet but offers itself as the gateway, so first run `sudo brain/tools/mac_rig_ethernet.sh` (a fixed address, no gateway: the internet stays on Wi-Fi), and once `sudo brain/tools/mac_rig_ethernet.sh permanent` (Wi-Fi first in the service order). Addresses come from `.env`: `S5_ROUTER_IP`, `S5_MAC_RIG_IP`.
+- **Network:** plug the rig router and the decks into the Mac's Ethernet. The router has no internet but offers itself as the gateway, so first run `sudo brain/tools/mac_rig_ethernet.sh` (a fixed address, no gateway: the internet stays on Wi-Fi), and once `sudo brain/tools/mac_rig_ethernet.sh permanent` (Wi-Fi first in the service order). Addresses come from `.env`: `S5_ROUTER_IP`, `S5_MAC_RIG_IP`. It also gives that Ethernet a self-assigned 169.254.x.x address (a second network service on the same port, which macOS keeps): decks switched on before the router is ready give themselves 169.254 addresses, still see each other, and without it the Mac can't hear them at all. `undo` removes both.
 - **Needs:** Homebrew `openjdk@21` (it builds deckdash from the checkout when the sources change), numpy, and for the par can `pyusb` with Homebrew `libusb`.
 - **Fixtures** by their `.local` names, or `S5_PYRAMID_L_HOST` etc. in `.env`. No panel unless `S5_RIG_BOX_HOST` is set.
 - **Decks:** it starts on the real decks and waits with **NO DECKS** if there are none; the simulation is offered there, and switches itself off when real decks turn up.
@@ -63,7 +63,7 @@ Run these on the rig after changing deckdash, the run script or the network, wit
 | 3 | Unplug the whole USB-C hub for 10 s, plug it back | As 2, and the par can's DMX `connected` again |
 | 4 | Unplug one deck's Ethernet for 10 s, plug it back | The other deck keeps driving the show; the unplugged one comes back by itself |
 | 5 | Start the show with the Mac's Ethernet unplugged, then plug it in | It waits (`NO DECKS`); joins by itself within 15 s of plugging in |
-| 6 | Power the decks on before the router (or restart the router with the decks on) | If the decks miss the router's DHCP, `deckdash.log` says so (self-assigned 169.254 addresses); replugging each deck's Ethernet joins them without restarting the show |
+| 6 | Power the decks on before the router (or restart the router with the decks on) | The decks miss the router's DHCP and take 169.254 addresses (the watcher shows them); with the Mac's link-local address from `mac_rig_ethernet.sh` they join anyway, within 15 s, no replugging and no restart |
 | 7 | Leave the Mac idle (lid open) for 15 min with the show running | Still `joined`; the run script keeps the Mac awake (`caffeinate`) |
 | 8 | With decks connected, try **Start simulation** (`POST /api/sim {"on":true}`); then unplug both decks | Refused while decks are there; **NO DECKS** offers it once they're gone |
 

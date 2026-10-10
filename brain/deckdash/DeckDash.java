@@ -129,7 +129,9 @@ public class DeckDash {
             String seen = seenDecks();
             if (!seen.equals(lastSeen)) {                  // say what's wrong once, not every 5 s
                 lastSeen = seen;
-                if (seen.isEmpty()) log("no DJ Link network yet (no decks heard), retrying every 5 s");
+                if (seen.isEmpty()) log("no DJ Link network yet (no decks heard), retrying every 5 s. If the decks are on and "
+                        + "can see each other, they may be on self-assigned 169.254 addresses this computer can't hear: "
+                        + "give its rig Ethernet one too (sudo brain/tools/mac_rig_ethernet.sh), or replug the decks' Ethernet");
                 else if (seen.contains("169.254.")) log("decks heard (" + seen + ") on self-assigned addresses: they missed "
                         + "the router's DHCP (on before the router was up?). Unplug and replug each deck's Ethernet, or "
                         + "restart the decks with the router already on. Retrying every 5 s");

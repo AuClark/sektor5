@@ -31,6 +31,9 @@ PY=python3
 "$PY" -c "import numpy" 2>/dev/null || { echo "needs numpy (brain/sim/run.sh makes a venv with it)"; exit 1; }
 "$PY" -c "import usb" 2>/dev/null || echo "note: no pyusb, so no par can ($PY -m pip install --user pyusb; brew install libusb)"
 
+# Decks that missed the router's DHCP sit on 169.254 addresses: without one too, the Mac can't hear them.
+ifconfig | grep -q "inet 169\.254\." || echo "note: no 169.254 address on this Mac, so decks that missed the router's DHCP won't be found (sudo brain/tools/mac_rig_ethernet.sh adds one)"
+
 for port in 8080 8090 8100 8110; do
   if lsof -nP -iTCP:$port -sTCP:LISTEN >/dev/null 2>&1; then
     echo "port $port is in use (another show or sim running?): $0 stop"; exit 1
