@@ -16,7 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
 LOGS="$REPO/brain/sim/logs"
-PAT="brain/sim/fakerig.py|$HOME/sim/fakerig.py|brain/showbrain/showbrain.py|brain/projector/projector.py 8100|brain/visuals/visuals.py 8110|DeckDash"
+PAT="brain/sim/fakerig.py|$HOME/sim/fakerig.py|brain/showbrain/showbrain.py|brain/projector/projector.py 8100|brain/visuals/visuals.py 8110|DeckDash|caffeinate -ims -w"
 
 if [ "${1:-}" = stop ]; then
   pkill -f "$PAT" && echo "show stopped" || echo "nothing running"
@@ -60,14 +60,17 @@ fi
 WEB="$LOGS/deckdash-web"                                                # deckdash's pages plus the shared ones
 mkdir -p "$WEB"
 for f in "$DD"/web/* brain/common/web/*; do ln -sfn "$REPO/$f" "$WEB/$(basename "$f")"; done
-(cd "$DD" && nohup "$JDK/bin/java" -Djava.awt.headless=true -Xmx768m -Dweb="$WEB" -Dpreview="$WEB" \
+(cd "$DD" && exec nohup "$JDK/bin/java" -Djava.awt.headless=true -Xmx768m -Dweb="$WEB" -Dpreview="$WEB" \
   -DauthFile="$S5_AUTH_FILE" -Dorg.slf4j.simpleLogger.defaultLogLevel=warn \
   -Dorg.slf4j.simpleLogger.log.org.deepsymmetry.beatlink.data.MetadataFinder=off \
-  -cp "lib/*:classes" DeckDash > "$LOGS/deckdash.log" 2>&1 &)
+  -cp "lib/*:classes" DeckDash > "$LOGS/deckdash.log" 2>&1) &     # exec: no shell left holding the terminal
 sleep 1
 nohup "$PY" -u brain/showbrain/showbrain.py     > "$LOGS/showbrain.log" 2>&1 &
 nohup "$PY" -u brain/projector/projector.py 8100 > "$LOGS/projector.log" 2>&1 &
 nohup "$PY" -u brain/visuals/visuals.py 8110     > "$LOGS/visuals.log"   2>&1 &
+# Keep the Mac awake while the show runs: sleeping drops the USB Ethernet and with it the decks.
+# (Closing the lid still sleeps it, unless it's on power with an external display.)
+nohup caffeinate -ims -w "$(pgrep -f 'brain/showbrain/showbrain.py' | head -1)" >/dev/null 2>&1 &
 sleep 3
 if pgrep -f "brain/showbrain/showbrain.py" >/dev/null; then
   echo "Sektor5 running on the real rig (logs in $LOGS). Stop: $0 stop"

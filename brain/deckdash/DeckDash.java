@@ -108,9 +108,34 @@ public class DeckDash {
 
         // Join the decks last: the dashboard, API and System view are up without them (decks off,
         // a new brain on the bench), and the players appear whenever the DJ Link network does.
+        joinDecks(vcdj);
+        // beat-link shuts the virtual CDJ down when the network goes from under it (an Ethernet blip,
+        // a USB hub resetting, the computer sleeping) and never starts it again by itself: watch for
+        // that and rejoin, so the show doesn't go deaf until someone restarts it.
+        while (true) {
+            Thread.sleep(2000);
+            if (!vcdj.isRunning()) {
+                log("lost the DJ Link network (Ethernet dropped?): rejoining");
+                joinDecks(vcdj);
+            }
+        }
+    }
+
+    /** Join the DJ Link network (retrying until there is one) and start the data finders. */
+    static void joinDecks(VirtualCdj vcdj) throws Exception {
         log("waiting for DJ Link devices...");
+        String lastSeen = null;
         while (!vcdj.start()) {
-            log("no DJ Link network yet, retrying in 5 s");
+            String seen = seenDecks();
+            if (!seen.equals(lastSeen)) {                  // say what's wrong once, not every 5 s
+                lastSeen = seen;
+                if (seen.isEmpty()) log("no DJ Link network yet (no decks heard), retrying every 5 s");
+                else if (seen.contains("169.254.")) log("decks heard (" + seen + ") on self-assigned addresses: they missed "
+                        + "the router's DHCP (on before the router was up?). Unplug and replug each deck's Ethernet, or "
+                        + "restart the decks with the router already on. Retrying every 5 s");
+                else log("decks heard (" + seen + ") but no network interface of this computer is on their subnet; "
+                        + "retrying every 5 s");
+            }
             Thread.sleep(5000);
         }
         log("joined as device " + vcdj.getDeviceNumber() + " on " + vcdj.getLocalAddress());
@@ -135,6 +160,18 @@ public class DeckDash {
                 log(name + " failed to start: " + e);
             }
         }
+    }
+
+    /** The DJ Link devices heard so far, "name #n at address, ...", for the join diagnostics. */
+    static String seenDecks() {
+        DeviceFinder f = DeviceFinder.getInstance();
+        if (!f.isRunning()) return "";
+        StringBuilder b = new StringBuilder();
+        for (DeviceAnnouncement d : f.getCurrentDevices()) {
+            if (b.length() > 0) b.append(", ");
+            b.append(d.getDeviceName()).append(" #").append(d.getDeviceNumber()).append(" at ").append(d.getAddress().getHostAddress());
+        }
+        return b.toString();
     }
 
     // ---------- HTTP ----------

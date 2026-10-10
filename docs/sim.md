@@ -52,6 +52,21 @@ Press Ctrl-C to stop everything. Each service's log is in `brain/sim/logs/`. Edi
 - **Fixtures** by their `.local` names, or `S5_PYRAMID_L_HOST` etc. in `.env`. No panel unless `S5_RIG_BOX_HOST` is set.
 - **Decks:** it starts on the real decks and waits with **NO DECKS** if there are none; the simulation is offered there, and switches itself off when real decks turn up.
 
+### Deck connection tests
+
+Run these on the rig after changing deckdash, the run script or the network, with `python3 brain/tools/djlink_watch.py` open in a terminal: it prints a line whenever the connection, the decks, the deck the lights follow or the par can's USB DMX change, and how long the connection took to come back. Pass when the watcher shows `joined` with both decks, and the lights follow a playing deck, within the time given. No step may need a restart of the show.
+
+| # | Do | Pass |
+|---|---|---|
+| 1 | Cold start: router on for a minute, decks on, Mac plugged in, then `brain/sim/run_rig.sh` | `joined`, both decks, within 15 s |
+| 2 | With a track playing, unplug the Mac's Ethernet for 10 s, plug it back | `lost the DJ Link network: rejoining` then `joined` in `deckdash.log`; back within 15 s; the lights follow the same deck and track |
+| 3 | Unplug the whole USB-C hub for 10 s, plug it back | As 2, and the par can's DMX `connected` again |
+| 4 | Unplug one deck's Ethernet for 10 s, plug it back | The other deck keeps driving the show; the unplugged one comes back by itself |
+| 5 | Start the show with the Mac's Ethernet unplugged, then plug it in | It waits (`NO DECKS`); joins by itself within 15 s of plugging in |
+| 6 | Power the decks on before the router (or restart the router with the decks on) | If the decks miss the router's DHCP, `deckdash.log` says so (self-assigned 169.254 addresses); replugging each deck's Ethernet joins them without restarting the show |
+| 7 | Leave the Mac idle (lid open) for 15 min with the show running | Still `joined`; the run script keeps the Mac awake (`caffeinate`) |
+| 8 | With decks connected, try **Start simulation** (`POST /api/sim {"on":true}`); then unplug both decks | Refused while decks are there; **NO DECKS** offers it once they're gone |
+
 ## On the brain
 
 The brain can run the same synthetic rig, so a Pi on the bench (or at home, with no decks) shows the whole app working, and the real lights follow the generated set.
