@@ -125,7 +125,8 @@ public class DeckDash {
                 System.exit(REJOIN);
             }
             List<DeviceAnnouncement> ds = new ArrayList<>(DeviceFinder.getInstance().getCurrentDevices());
-            if (!ds.isEmpty() && ds.stream().noneMatch(d -> onOurNetwork(vcdj, d.getAddress()))) {
+            boolean wrongSide = selfAssigned(vcdj.getLocalAddress()) && ds.stream().anyMatch(d -> !selfAssigned(d.getAddress()));
+            if (!ds.isEmpty() && (wrongSide || ds.stream().noneMatch(d -> onOurNetwork(vcdj, d.getAddress())))) {
                 if (offSince == 0) offSince = System.currentTimeMillis();
                 else if (System.currentTimeMillis() - offSince > 6000) {
                     log("the decks are on another network now (" + seenDecks() + "): restarting to rejoin on it");
@@ -143,6 +144,10 @@ public class DeckDash {
                             + "its Ethernet is replugged with the router on");
             }
         }
+    }
+
+    static boolean selfAssigned(java.net.InetAddress a) {
+        return a != null && a.getHostAddress().startsWith("169.254.");
     }
 
     /** Whether ADDR is on the network the virtual CDJ joined. */
@@ -175,7 +180,22 @@ public class DeckDash {
     static void joinDecks(VirtualCdj vcdj) throws Exception {
         log("waiting for DJ Link devices...");
         String lastSeen = null;
-        while (!vcdj.start()) {
+        DeviceFinder finder = DeviceFinder.getInstance();
+        finder.start();
+        while (true) {
+            // With some decks on the router's addresses and some self-assigned (they missed its DHCP),
+            // join the router's side: only there do we get track info, and the others join it once
+            // replugged. The virtual CDJ joins the network of whichever deck it hears first, so keep
+            // the self-assigned ones out of its sight while it joins.
+            Thread.sleep(1500);                            // hear the decks that are there
+            List<java.net.InetAddress> hidden = new ArrayList<>();
+            List<DeviceAnnouncement> now = new ArrayList<>(finder.getCurrentDevices());
+            if (now.stream().anyMatch(d -> !selfAssigned(d.getAddress())))
+                for (DeviceAnnouncement d : now)
+                    if (selfAssigned(d.getAddress())) { finder.addIgnoredAddress(d.getAddress()); hidden.add(d.getAddress()); }
+            boolean ok = vcdj.start();
+            for (java.net.InetAddress a : hidden) finder.removeIgnoredAddress(a);    // heard again: for the warning
+            if (ok) break;
             String seen = seenDecks();
             if (!seen.equals(lastSeen)) {                  // say what's wrong once, not every 5 s
                 lastSeen = seen;

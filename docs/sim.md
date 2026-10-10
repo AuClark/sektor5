@@ -63,7 +63,9 @@ Run these on the rig after changing deckdash, the run script or the network, wit
 | 3 | Unplug the whole USB-C hub for 10 s, plug it back | As 2, and the par can's DMX `connected` again |
 | 4 | Unplug one deck's Ethernet for 10 s, plug it back | The other deck keeps driving the show; the unplugged one comes back by itself |
 | 5 | Start the show with the Mac's Ethernet unplugged, then plug it in | It waits (`NO DECKS`); joins by itself within 15 s of plugging in |
-| 6 | Power the decks on before the router (or restart the router with the decks on) | The decks miss the router's DHCP and take 169.254 addresses (the watcher shows them); with the Mac's link-local address from `mac_rig_ethernet.sh` they join anyway, within 15 s, no replugging and no restart |
+| 6 | Restart the router with the decks on | The show waits, then joins the decks on the router's addresses. A deck that asks for an address before the router's DHCP is up takes a self-assigned 169.254 one and keeps it (seen 2026-10-10); the show then joins the router's side anyway, the beat still works, and the Live pill says to replug that deck |
+
+**Keeping the decks on the router's addresses.** XDJs have no static IP setting, and after a failed DHCP request they keep a self-assigned address until their Ethernet is replugged. A router restart drops their link, and they ask again before its DHCP is up. So: put a small unmanaged switch between the router and the decks + Mac (the decks' links stay up through a router restart, so they keep their addresses); reserve each deck's address in the router's DHCP settings; and on a cold start, power the router about a minute before the decks.
 | 7 | Leave the Mac idle (lid open) for 15 min with the show running | Still `joined`; the run script keeps the Mac awake (`caffeinate`) |
 | 8 | With decks connected, try **Start simulation** (`POST /api/sim {"on":true}`); then unplug both decks | Refused while decks are there; **NO DECKS** offers it once they're gone |
 
