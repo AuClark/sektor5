@@ -17,11 +17,26 @@ set -euo pipefail
 cd "$(dirname "$0")"
 REPO="$PWD"
 LOGS="$REPO/logs"
-PAT="brain/sim/fakerig.py|$HOME/sim/fakerig.py|brain/showbrain/showbrain.py|brain/projector/projector.py 8100|brain/visuals/visuals.py 8110|DeckDash|caffeinate -ims -w"
+PAT="brain/sim/fakerig.py|$HOME/sim/fakerig.py|brain/showbrain/showbrain.py|brain/projector/projector.py 8100|brain/visuals/visuals.py 8110|DeckDash|run.sh _deckdash|caffeinate -ims -w"
 
 if [ "${1:-}" = stop ]; then
   pkill -f "$PAT" && echo "show stopped" || echo "nothing running"
   exit 0
+fi
+
+# (internal) deckdash, started again whenever it exits with 75: it does that to rejoin the decks from
+# scratch after a network drop or change (see DeckDash.java). Anything else (stop, a crash) ends it.
+if [ "${1:-}" = _deckdash ]; then
+  cd "$DD"
+  while :; do
+    "$JDK/bin/java" -Djava.awt.headless=true -Xmx768m -Dweb="$WEB" -Dpreview="$WEB" \
+      -DauthFile="$S5_AUTH_FILE" -Dorg.slf4j.simpleLogger.defaultLogLevel=warn \
+      -Dorg.slf4j.simpleLogger.log.org.deepsymmetry.beatlink.data.MetadataFinder=off \
+      -cp "lib/*:classes" DeckDash >> "$LOGS/deckdash.log" 2>&1 && rc=0 || rc=$?
+    [ "$rc" = 75 ] || exit 0
+    echo "$(date)  (run.sh) starting deckdash again to rejoin the decks" >> "$LOGS/deckdash.log"
+    sleep 1
+  done
 fi
 
 JDK="$(brew --prefix openjdk@21 2>/dev/null || true)"
@@ -64,10 +79,9 @@ fi
 WEB="$LOGS/deckdash-web"                                                # deckdash's pages plus the shared ones (links)
 mkdir -p "$WEB"
 for f in "$DD"/web/* brain/common/web/*; do ln -sfn "$REPO/$f" "$WEB/$(basename "$f")"; done
-(cd "$DD" && exec nohup "$JDK/bin/java" -Djava.awt.headless=true -Xmx768m -Dweb="$WEB" -Dpreview="$WEB" \
-  -DauthFile="$S5_AUTH_FILE" -Dorg.slf4j.simpleLogger.defaultLogLevel=warn \
-  -Dorg.slf4j.simpleLogger.log.org.deepsymmetry.beatlink.data.MetadataFinder=off \
-  -cp "lib/*:classes" DeckDash > "$LOGS/deckdash.log" 2>&1) &     # exec: no shell left holding the terminal
+: > "$LOGS/deckdash.log"
+export JDK WEB LOGS DD S5_AUTH_FILE
+nohup "$REPO/run.sh" _deckdash >/dev/null 2>&1 &
 sleep 1
 nohup "$PY" -u brain/showbrain/showbrain.py     > "$LOGS/showbrain.log" 2>&1 &
 nohup "$PY" -u brain/projector/projector.py 8100 > "$LOGS/projector.log" 2>&1 &

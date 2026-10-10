@@ -110,28 +110,26 @@ public class DeckDash {
         // a new brain on the bench), and the players appear whenever the DJ Link network does.
         joinDecks(vcdj);
         // beat-link shuts the virtual CDJ down when the network goes from under it (an Ethernet blip,
-        // a USB hub resetting, the computer sleeping) and never starts it again by itself: watch for
-        // that and rejoin, so the show doesn't go deaf until someone restarts it.
-        // It also stays on the network it joined when the decks move to another (they took
-        // self-assigned 169.254 addresses, then got the router's after a replug): rejoin on theirs.
+        // a USB hub resetting, the computer sleeping) and never starts it again by itself; it also stays
+        // on the network it joined when the decks move to another (they took self-assigned 169.254
+        // addresses, then got the router's after a replug). Rejoining in the same process gets the beat
+        // back but not the track info (the metadata finders don't pick the loaded tracks up again), so
+        // exit with REJOIN and let the supervisor start us fresh: ./run.sh's loop on a Mac, systemd's
+        // Restart=always on the brain. A fresh start is back with everything in about 5 s.
         long offSince = 0;
         Set<String> warned = new HashSet<>();
         while (true) {
             Thread.sleep(2000);
             if (!vcdj.isRunning()) {
-                log("lost the DJ Link network (Ethernet dropped?): rejoining");
-                joinDecks(vcdj);
-                offSince = 0;
-                continue;
+                log("lost the DJ Link network (Ethernet dropped?): restarting to rejoin");
+                System.exit(REJOIN);
             }
             List<DeviceAnnouncement> ds = new ArrayList<>(DeviceFinder.getInstance().getCurrentDevices());
             if (!ds.isEmpty() && ds.stream().noneMatch(d -> onOurNetwork(vcdj, d.getAddress()))) {
                 if (offSince == 0) offSince = System.currentTimeMillis();
                 else if (System.currentTimeMillis() - offSince > 6000) {
-                    log("the decks are on another network now (" + seenDecks() + "): rejoining on it");
-                    vcdj.stop();
-                    joinDecks(vcdj);
-                    offSince = 0;
+                    log("the decks are on another network now (" + seenDecks() + "): restarting to rejoin on it");
+                    System.exit(REJOIN);
                 }
             } else offSince = 0;
             // A deck on a self-assigned address can be heard (beat, tempo, play state: the lights follow
@@ -169,6 +167,9 @@ public class DeckDash {
         }
         return true;                                   // can't tell: leave it be
     }
+
+    /** Exit code asking the supervisor (./run.sh, systemd) for a fresh start to rejoin the decks. */
+    static final int REJOIN = 75;
 
     /** Join the DJ Link network (retrying until there is one) and start the data finders. */
     static void joinDecks(VirtualCdj vcdj) throws Exception {
